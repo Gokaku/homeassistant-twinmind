@@ -42,6 +42,30 @@ export class MockProvider implements Provider {
     };
     await stream("reasoning-delta", randomUUID(), "The user wants a demo. I'll look at the configuration first, then answer. ");
 
+    // "plan" exercises a todo list and a plan approval (Claude's TodoWrite / ExitPlanMode).
+    if (/\bplan\b/i.test(ctx.prompt)) {
+      emit({
+        type: "part",
+        part: {
+          type: "todo",
+          id: "todo",
+          items: [
+            { text: "Find the hallway light and motion sensor", status: "completed" },
+            { text: "Draft the automation", status: "in_progress" },
+            { text: "Check the configuration", status: "pending" },
+          ],
+        },
+      });
+      const id = randomUUID();
+      const plan = "## Hallway night light\n\n1. Trigger on `binary_sensor.hallway_motion` after sunset\n2. Turn on `light.hallway` at 30 %\n3. Turn it off after 2 minutes without motion";
+      const input = { plan };
+      emit({ type: "part", part: { type: "tool", id, name: "ExitPlanMode", kind: "other", title: "Plan ready", input, state: "running" } });
+      const d = await ctx.requestApproval({ toolPartId: id, name: "ExitPlanMode", kind: "other", title: "Plan ready", input });
+      emit({ type: "part", part: { type: "tool", id, name: "ExitPlanMode", kind: "other", title: "Plan ready", input, state: d === "deny" ? "denied" : "completed" } });
+      await stream("text-delta", randomUUID(), d === "deny" ? "Okay, I'll keep planning." : "Great, building it now.");
+      return { status: "completed" };
+    }
+
     // "ask me" exercises questions (Claude's AskUserQuestion / Codex's requestUserInput).
     if (/\bask me\b/i.test(ctx.prompt)) {
       const answers = await ctx.requestInput({
