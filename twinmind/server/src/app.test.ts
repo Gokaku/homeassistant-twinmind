@@ -220,6 +220,24 @@ describe("WebSocket", () => {
     expect((await fetch(`${base}/api/me`, { headers: admin })).status).toBe(200);
   });
 
+  it("does not bring back a chat deleted while it was replying", async () => {
+    const c = connect(admin);
+    await c.waitFor("hello");
+    c.ws.send(JSON.stringify({ type: "send", clientRequestId: "del1", provider: "mock", mode: "ask", text: "delete me" }));
+    const conv = await c.waitFor("conversation", (e) => e.clientRequestId === "del1");
+    await c.waitFor("part", (e) => e.conversationId === conv.meta.id && e.part.type === "tool" && e.part.state === "awaiting-approval");
+    const del = await fetch(`${base}/api/conversations/${conv.meta.id}`, { method: "DELETE", headers: { ...admin, "x-twinmind": "1" } });
+    expect(del.status).toBe(200);
+    await c.waitFor("turn.end", (e) => e.conversationId === conv.meta.id);
+    await new Promise((r) => setTimeout(r, 100));
+    expect((await fetch(`${base}/api/conversations/${conv.meta.id}`, { headers: admin })).status).toBe(404);
+    const after = c.events.filter((e) => e.type === "conversation" && e.meta.id === conv.meta.id && c.events.indexOf(e) > c.events.findIndex((x) => x.type === "turn.end" && x.conversationId === conv.meta.id));
+    expect(after).toHaveLength(0);
+    const files = await fs.readdir(path.join(dir, "conversations"));
+    expect(files).not.toContain(`${conv.meta.id}.json`);
+    c.ws.close();
+  });
+
   it("rejects unknown modes", async () => {
     const c = connect(admin);
     await c.waitFor("hello");

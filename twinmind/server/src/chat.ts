@@ -342,7 +342,8 @@ export class ChatService implements ToolGate {
       this.running.delete(cid);
       await this.store.save(conv).catch(() => {});
       this.broadcast({ type: "turn.end", conversationId: cid, messageId: mid, status, error });
-      this.broadcast({ type: "conversation", meta: this.metaWithStatus(conv) });
+      // Deleted while the reply was running: do not resurrect it in open UIs.
+      if (this.store.get(cid) === conv) this.broadcast({ type: "conversation", meta: this.metaWithStatus(conv) });
     }
   }
 

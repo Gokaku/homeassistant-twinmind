@@ -89,6 +89,8 @@ export class ConversationStore {
 
   /** Persist a conversation. Writes for the same id are serialized. */
   save(c: Conversation): Promise<void> {
+    // A reply that ends after its chat was deleted must not write the file back.
+    if (this.cache.get(c.id) !== c) return Promise.resolve();
     c.messageCount = c.messages.length;
     const prev = this.writes.get(c.id) ?? Promise.resolve();
     const next = prev
