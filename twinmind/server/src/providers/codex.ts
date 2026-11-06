@@ -194,11 +194,22 @@ export class CodexProvider implements Provider {
               } } }
         : undefined,
     };
-    const started = ctx.nativeId
-      ? await rpc.call("thread/resume", { threadId: ctx.nativeId, excludeTurns: true, ...common })
-      : await rpc.call("thread/start", { ...common, threadSource: "twinmind" });
+    let started: any = null;
+    if (ctx.nativeId) {
+      try {
+        started = await rpc.call("thread/resume", { threadId: ctx.nativeId, excludeTurns: true, ...common });
+      } catch (e: any) {
+        // A thread whose first turn never ran was never written to disk and cannot be resumed.
+        // Start over instead of failing this chat forever.
+        if (!/no rollout|not found/i.test(String(e?.message))) throw e;
+        ctx.emit({
+          type: "part",
+          part: { type: "notice", id: randomUUID(), level: "warning", text: "Codex could not find its earlier thread for this chat and started a new one; it may miss earlier context." },
+        });
+      }
+    }
+    started ??= await rpc.call("thread/start", { ...common, threadSource: "twinmind" });
     const threadId: string = started.thread.id;
-    ctx.emit({ type: "native-id", id: threadId });
     if (this.turns.has(threadId)) throw new Error("This Codex thread is already busy");
 
     const input: any[] = [{ type: "text", text: this.promptWithFiles(ctx), text_elements: [] }];
@@ -238,6 +249,8 @@ export class CodexProvider implements Provider {
         })
         .then((r) => {
           turn.turnId = r?.turn?.id ?? null;
+          // Only now is the thread real (persisted by Codex): remember it for this chat.
+          ctx.emit({ type: "native-id", id: threadId });
           if (ctx.signal.aborted) onAbort();
         })
         .catch((e) => turn.reject(e));
