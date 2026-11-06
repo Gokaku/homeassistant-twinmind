@@ -42,6 +42,36 @@ export class MockProvider implements Provider {
     };
     await stream("reasoning-delta", randomUUID(), "The user wants a demo. I'll look at the configuration first, then answer. ");
 
+    // "ask me" exercises questions (Claude's AskUserQuestion / Codex's requestUserInput).
+    if (/\bask me\b/i.test(ctx.prompt)) {
+      const answers = await ctx.requestInput({
+        partId: randomUUID(),
+        questions: [
+          {
+            id: "room",
+            header: "Room",
+            question: "Which room should the automation control?",
+            options: [
+              { label: "Kitchen", description: "light.kitchen" },
+              { label: "Hallway", description: "light.hallway" },
+            ],
+            multiSelect: false,
+            allowOther: true,
+          },
+          {
+            id: "when",
+            header: "When",
+            question: "When should it run?",
+            options: [{ label: "Sunset" }, { label: "Motion" }, { label: "At a fixed time" }],
+            multiSelect: true,
+            allowOther: false,
+          },
+        ],
+      });
+      await stream("text-delta", randomUUID(), answers ? `Got it: ${Object.entries(answers).map(([k, v]) => `${k} = ${v.join(" + ")}`).join("; ")}.` : "No problem, we can do that later.");
+      return { status: "completed" };
+    }
+
     // "rename" exercises the Home Assistant tools end to end (MCP + approval gate).
     if (/\brename\b/i.test(ctx.prompt) && ctx.mcp) {
       const id = randomUUID();

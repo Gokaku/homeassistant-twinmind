@@ -38,6 +38,8 @@ interface PendingApproval {
 export class ChatService implements ToolGate {
   private running = new Map<string, RunningTurn>();
   private approvals = new Map<string, PendingApproval>();
+  /** Open questions, by question part id. */
+  private inputs = new Map<string, { conversationId: string; resolve: (a: Record<string, string[]> | null) => void }>();
   /** conversation id -> MCP token, and back. Tokens live as long as the process. */
   private tokens = new Map<string, string>();
   private tokenOwners = new Map<string, string>();
@@ -316,6 +318,30 @@ export class ChatService implements ToolGate {
         this.approvals.set(approvalId, { conversationId: cid, messageId: mid, partId: req.toolPartId, resolve: done });
       });
 
+    const requestInput: TurnContext["requestInput"] = (req) =>
+      new Promise((resolve) => {
+        if (controller.signal.aborted || req.signal?.aborted) return resolve(null);
+        upsert({ type: "question", id: req.partId, questions: req.questions, state: "pending" });
+        void this.store.save(conv);
+        const done = (answers: Record<string, string[]> | null) => {
+          if (!this.inputs.delete(req.partId)) return;
+          controller.signal.removeEventListener("abort", onAbort);
+          req.signal?.removeEventListener("abort", onAbort);
+          upsert({
+            type: "question",
+            id: req.partId,
+            questions: req.questions,
+            state: answers ? "answered" : "dismissed",
+            answers: answers ?? undefined,
+          });
+          resolve(answers);
+        };
+        const onAbort = () => done(null);
+        controller.signal.addEventListener("abort", onAbort, { once: true });
+        req.signal?.addEventListener("abort", onAbort, { once: true });
+        this.inputs.set(req.partId, { conversationId: cid, resolve: done });
+      });
+
     const turnState = this.running.get(cid);
     if (turnState) turnState.requestApproval = requestApproval;
 
@@ -333,6 +359,7 @@ export class ChatService implements ToolGate {
         signal: controller.signal,
         emit,
         requestApproval,
+        requestInput,
       });
       status = controller.signal.aborted ? "interrupted" : r.status;
     } catch (e) {
@@ -344,6 +371,7 @@ export class ChatService implements ToolGate {
       }
     } finally {
       for (const [id, a] of this.approvals) if (a.conversationId === cid) a.resolve("deny"), this.approvals.delete(id);
+      for (const q of [...this.inputs.values()]) if (q.conversationId === cid) q.resolve(null);
       // Any tool still marked running did not finish.
       for (const p of assistant.parts) {
         if (p.type === "tool" && (p.state === "running" || p.state === "awaiting-approval")) {
@@ -361,6 +389,21 @@ export class ChatService implements ToolGate {
       // Deleted while the reply was running: do not resurrect it in open UIs.
       if (this.store.get(cid) === conv) this.broadcast({ type: "conversation", meta: this.metaWithStatus(conv) });
     }
+  }
+
+  /** Answer (or, with null, dismiss) an open question. */
+  answer(questionPartId: string, answers: Record<string, string[]> | null): boolean {
+    const q = this.inputs.get(questionPartId);
+    if (!q) return false;
+    if (answers !== null) {
+      // Only string arrays, bounded.
+      const clean: Record<string, string[]> = {};
+      for (const [k, v] of Object.entries(answers ?? {}).slice(0, 10)) {
+        if (Array.isArray(v)) clean[String(k).slice(0, 2000)] = v.filter((x) => typeof x === "string").map((x) => x.slice(0, 5000)).slice(0, 20);
+      }
+      q.resolve(clean);
+    } else q.resolve(null);
+    return true;
   }
 
   approve(approvalId: string, decision: ApprovalDecision): boolean {

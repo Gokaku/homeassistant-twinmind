@@ -476,6 +476,23 @@ export class CodexProvider implements Provider {
           const d = await ask("command", truncate(cmd, 160), { command: cmd }, p.reason);
           return rpc.respond(req.id, { decision: d === "allow" ? "approved" : d === "allow-session" ? "approved_for_session" : { denied: { rejection: "The user declined." } } });
         }
+        case "item/tool/requestUserInput": {
+          const qs: any[] = Array.isArray(p.questions) ? p.questions : [];
+          const answers = await turn.ctx.requestInput({
+            partId: `${p.itemId ?? randomUUID()}:q`,
+            questions: qs.map((q) => ({
+              id: String(q.id),
+              header: String(q.header ?? ""),
+              question: String(q.question ?? ""),
+              options: Array.isArray(q.options) ? q.options.map((o: any) => ({ label: String(o.label ?? ""), description: o.description })) : [],
+              multiSelect: false,
+              allowOther: !!q.isOther || !q.options?.length,
+            })),
+          });
+          const out: Record<string, { answers: string[] }> = {};
+          for (const [k, v] of Object.entries(answers ?? {})) out[k] = { answers: v };
+          return rpc.respond(req.id, { answers: out });
+        }
         case "applyPatchApproval": {
           const d = await ask("file", "Apply file changes", p.fileChanges, p.reason);
           return rpc.respond(req.id, { decision: d === "allow" ? "approved" : d === "allow-session" ? "approved_for_session" : { denied: { rejection: "The user declined." } } });

@@ -1,4 +1,5 @@
 import type {
+  Question,
   ApprovalDecision,
   AuthState,
   ChatMessage,
@@ -42,6 +43,8 @@ export interface TurnContext {
   signal: AbortSignal;
   emit(e: ProviderEvent): void;
   requestApproval(req: ApprovalRequest): Promise<ApprovalDecision>;
+  /** Ask the user questions; resolves with their answers, or null if dismissed/aborted. */
+  requestInput(req: { partId: string; questions: Question[]; signal?: AbortSignal }): Promise<Record<string, string[]> | null>;
 }
 
 export interface NativeSession {

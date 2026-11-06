@@ -238,6 +238,23 @@ describe("WebSocket", () => {
     c.ws.close();
   });
 
+  it("asks questions and passes the answers back to the assistant", async () => {
+    const c = connect(admin);
+    await c.waitFor("hello");
+    c.ws.send(JSON.stringify({ type: "send", clientRequestId: "q1", provider: "mock", mode: "ask", text: "ask me first" }));
+    const conv = await c.waitFor("conversation", (e) => e.clientRequestId === "q1");
+    const q = await c.waitFor("part", (e) => e.conversationId === conv.meta.id && e.part.type === "question" && e.part.state === "pending");
+    c.ws.send(JSON.stringify({ type: "answer", questionPartId: q.part.id, answers: { room: ["Hallway"], when: ["Sunset", "Motion"] } }));
+    const answered = await c.waitFor("part", (e) => e.part.id === q.part.id && (e.part as any).state === "answered");
+    expect((answered.part as any).answers.when).toEqual(["Sunset", "Motion"]);
+    await c.waitFor("turn.end", (e) => e.conversationId === conv.meta.id);
+    const r = await (await fetch(`${base}/api/conversations/${conv.meta.id}`, { headers: admin })).json();
+    expect(JSON.stringify(r.conversation.messages[1].parts)).toContain("room = Hallway; when = Sunset + Motion");
+    c.ws.send(JSON.stringify({ type: "answer", questionPartId: q.part.id, answers: null }));
+    await c.waitFor("error", (e) => /no longer open/.test(e.message));
+    c.ws.close();
+  });
+
   it("rejects unknown modes", async () => {
     const c = connect(admin);
     await c.waitFor("hello");

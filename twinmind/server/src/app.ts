@@ -292,6 +292,10 @@ export function createApp(deps: AppDeps) {
             if (typeof msg.approvalId !== "string" || !chat.approve(msg.approvalId, msg.decision))
               send({ type: "error", message: "That approval is no longer pending" });
             return;
+          case "answer":
+            if (typeof msg.questionPartId !== "string" || !chat.answer(msg.questionPartId, msg.answers ?? null))
+              send({ type: "error", message: "That question is no longer open" });
+            return;
           case "interrupt":
             if (isValidId(msg.conversationId)) chat.interrupt(msg.conversationId);
             return;

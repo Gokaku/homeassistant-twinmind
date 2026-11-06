@@ -51,7 +51,26 @@ export interface NoticePart {
   level: "info" | "warning" | "error";
   text: string;
 }
-export type Part = TextPart | ReasoningPart | ToolPart | TodoPart | FilePart | NoticePart;
+export interface Question {
+  /** Key the provider uses for the answer (Claude: the question text, Codex: an id). */
+  id: string;
+  header: string;
+  question: string;
+  options: { label: string; description?: string }[];
+  multiSelect: boolean;
+  /** Free-text answers allowed (in addition to, or instead of, options). */
+  allowOther: boolean;
+}
+/** The assistant asks the user something and waits for the answer. */
+export interface QuestionPart {
+  type: "question";
+  id: string;
+  questions: Question[];
+  state: "pending" | "answered" | "dismissed";
+  /** question id -> chosen option labels and/or free text */
+  answers?: Record<string, string[]>;
+}
+export type Part = TextPart | ReasoningPart | ToolPart | TodoPart | FilePart | NoticePart | QuestionPart;
 
 export interface ChatMessage {
   id: string;
@@ -137,6 +156,8 @@ export type ClientMessage =
       attachments?: string[];
     }
   | { type: "approve"; approvalId: string; decision: ApprovalDecision }
+  /** Answer a question part; answers null = dismiss. */
+  | { type: "answer"; questionPartId: string; answers: Record<string, string[]> | null }
   | { type: "interrupt"; conversationId: string }
   /** Ask for a snapshot of a conversation (ordered with the live events on this socket). */
   | { type: "subscribe"; conversationId: string }

@@ -276,6 +276,28 @@ export class ClaudeProvider implements Provider {
 
     const canUseTool: CanUseTool = async (toolName, input, options) => {
       const id = options.toolUseID || randomUUID();
+      // Claude asks the user a multiple-choice question: show it, return the answers.
+      if (toolName === "AskUserQuestion") {
+        const qs: any[] = Array.isArray((input as any)?.questions) ? (input as any).questions : [];
+        const answers = await ctx.requestInput({
+          partId: `${id}:q`,
+          signal: options.signal,
+          questions: qs.map((q) => ({
+            id: String(q.question ?? ""),
+            header: String(q.header ?? ""),
+            question: String(q.question ?? ""),
+            options: Array.isArray(q.options) ? q.options.map((o: any) => ({ label: String(o.label ?? ""), description: o.description })) : [],
+            multiSelect: !!q.multiSelect,
+            allowOther: true, // Claude always offers "Other"
+          })),
+        });
+        if (!answers) return { behavior: "deny", message: "The user dismissed the question without answering.", toolUseID: id };
+        return {
+          behavior: "allow",
+          updatedInput: { ...input, answers: Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, v.join(", ")])) },
+          toolUseID: id,
+        };
+      }
       const decision = await ctx.requestApproval({
         toolPartId: id,
         name: toolName,
@@ -341,8 +363,6 @@ export class ClaudeProvider implements Provider {
         allowDangerouslySkipPermissions: mode === "bypassPermissions",
         includePartialMessages: true,
         canUseTool,
-        // Its multiple-choice UI has no equivalent here; Claude asks in plain text instead.
-        disallowedTools: ["AskUserQuestion"],
         // Twinmind's Home Assistant tools. Approval for changes is enforced by Twinmind's MCP gate,
         // so Claude itself does not prompt for them.
         ...(ctx.mcp
