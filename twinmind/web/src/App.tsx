@@ -54,7 +54,7 @@ function Header({ onAccounts }: { onAccounts: () => void }) {
   const title = useStore((s) => (s.currentId ? s.conversations.find((c) => c.id === s.currentId)?.title : null));
   const hasChat = useStore((s) => !!s.currentId);
   return (
-    <header className="pt-safe flex h-14 shrink-0 items-center gap-2 border-b px-2">
+    <header className="pt-safe box-content flex h-14 shrink-0 items-center gap-2 border-b px-2">
       <SidebarTrigger />
       <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />
       <span className="min-w-0 flex-1 truncate font-medium text-sm">{title ?? "Twinmind"}</span>
