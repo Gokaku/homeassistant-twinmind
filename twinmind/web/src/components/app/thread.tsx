@@ -7,7 +7,18 @@ import { Spinner } from "@/components/ui/spinner";
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
-import { Task, TaskContent, TaskItem, TaskTrigger } from "@/components/ai-elements/task";
+import {
+  Queue,
+  QueueItem,
+  QueueItemContent,
+  QueueItemDescription,
+  QueueItemIndicator,
+  QueueList,
+  QueueSection,
+  QueueSectionContent,
+  QueueSectionLabel,
+  QueueSectionTrigger,
+} from "@/components/ai-elements/queue";
 import { uploadUrl } from "@/lib/api";
 import type { ChatMessage, Part, ProviderId } from "@/lib/protocol";
 import { useStore } from "@/lib/store";
@@ -15,11 +26,7 @@ import { cn } from "@/lib/utils";
 import {
   AlertTriangleIcon,
   ArrowLeftRightIcon,
-  CheckCircle2Icon,
   CheckIcon,
-  ChevronDownIcon,
-  CircleDashedIcon,
-  CircleIcon,
   CopyIcon,
   InfoIcon,
   ListTodoIcon,
@@ -162,31 +169,29 @@ function PartView({ part, provider, streaming }: { part: Part; provider: Provide
     case "todo": {
       const done = part.items.filter((i) => i.status === "completed").length;
       return (
-        <Task defaultOpen className="rounded-xl border bg-card/60 p-3">
-          <TaskTrigger title="Plan">
-            <button type="button" className="flex w-full items-center gap-2 text-muted-foreground text-sm hover:text-foreground">
-              <ListTodoIcon className="size-4" />
-              <span>
-                Plan · {done}/{part.items.length} done
+        <Queue>
+          <QueueSection>
+            <QueueSectionTrigger>
+              <QueueSectionLabel icon={<ListTodoIcon className="size-4" />} count={part.items.length} label="tasks" />
+              <span className="text-xs">
+                {done}/{part.items.length} done
               </span>
-              <ChevronDownIcon className="ml-auto size-4 transition-transform group-data-[state=open]:rotate-180" />
-            </button>
-          </TaskTrigger>
-          <TaskContent>
-            {part.items.map((it, i) => (
-              <TaskItem key={i} className="flex items-start gap-2">
-                {it.status === "completed" ? (
-                  <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-safe" />
-                ) : it.status === "in_progress" ? (
-                  <CircleDashedIcon className="mt-0.5 size-4 shrink-0 animate-spin text-codex [animation-duration:3s]" />
-                ) : (
-                  <CircleIcon className="mt-0.5 size-4 shrink-0" />
-                )}
-                <span className={cn(it.status === "completed" && "line-through opacity-60")}>{it.text}</span>
-              </TaskItem>
-            ))}
-          </TaskContent>
-        </Task>
+            </QueueSectionTrigger>
+            <QueueSectionContent>
+              <QueueList>
+                {part.items.map((it, i) => (
+                  <QueueItem key={i}>
+                    <div className="flex items-center gap-2">
+                      <QueueItemIndicator completed={it.status === "completed"} />
+                      <QueueItemContent completed={it.status === "completed"}>{it.text}</QueueItemContent>
+                    </div>
+                    {it.status === "in_progress" && <QueueItemDescription>In progress</QueueItemDescription>}
+                  </QueueItem>
+                ))}
+              </QueueList>
+            </QueueSectionContent>
+          </QueueSection>
+        </Queue>
       );
     }
     case "notice":
