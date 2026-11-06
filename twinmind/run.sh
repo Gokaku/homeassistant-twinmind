@@ -11,7 +11,7 @@ chmod 700 /data/home /data/claude /data/codex /data/conversations /data/uploads
 
 export TWINMIND_DATA_DIR=/data
 export TWINMIND_WORKDIR=/config
-export TWINMIND_PORT="$(bashio::addon.ingress_port)"
+export TWINMIND_PORT="$(bashio::app.ingress_port)"
 export TWINMIND_WEB_DIR=/opt/twinmind/web/dist
 
 # Updates come with new add-on versions, not from inside the container.
