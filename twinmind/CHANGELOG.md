@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.1
+
+- The UI is built only from shadcn/ui and AI Elements components, following the AI Elements
+  chatbot: the assistant and model are picked in one ModelSelector (with provider logos)
+  instead of a header switch, attachments are added from the prompt's action menu, tool
+  calls use the standard Tool header/input/output, approvals the standard Confirmation, the
+  conversation list is the shadcn Sidebar, and the welcome, error and admin-only screens use
+  the empty-state components. Custom colors, avatars and layouts were removed.
+
 ## 0.3.0
 
 - Assistants can ask you questions (single or multiple choice, or free text) and continue
