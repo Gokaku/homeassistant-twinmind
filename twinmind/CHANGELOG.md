@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.5
+
+- Copy buttons work when Home Assistant is opened over http:// and in the companion app.
+
 ## 0.3.4
 
 - Cleaner add-on log: no repeated Claude SDK warning on every reply, no bashio deprecation
