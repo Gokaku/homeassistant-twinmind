@@ -1,11 +1,12 @@
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { api } from "@/lib/api";
 import type { ProviderInfo } from "@/lib/protocol";
 import { refreshProviders, toast, useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { CheckIcon, CopyIcon, ExternalLinkIcon, LoaderCircleIcon, LogOutIcon, ShieldCheckIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, ExternalLinkIcon, LogOutIcon, ShieldCheckIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PROVIDER_STYLE } from "./brand";
 import { confirmDialog } from "./dialogs";
@@ -97,7 +98,7 @@ function ProviderCard({ p }: { p: ProviderInfo }) {
           </Button>
         ) : a.state === "signed-out" ? (
           <Button size="sm" disabled={busy} className={cn("rounded-full text-white", s.bg)} onClick={() => run(() => api(`providers/${p.id}/login`, { method: "POST" }))}>
-            {busy ? <LoaderCircleIcon className="size-4 animate-spin" /> : null} Sign in
+            {busy ? <Spinner className="size-4" /> : null} Sign in
           </Button>
         ) : null}
       </div>
@@ -120,7 +121,7 @@ function ProviderCard({ p }: { p: ProviderInfo }) {
           >
             <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Authentication code" autoComplete="off" className="rounded-xl" />
             <Button type="submit" disabled={busy || !code.trim()} className="rounded-xl">
-              {busy ? <LoaderCircleIcon className="size-4 animate-spin" /> : "Finish"}
+              {busy ? <Spinner className="size-4" /> : "Finish"}
             </Button>
           </form>
         </div>
@@ -146,7 +147,7 @@ function ProviderCard({ p }: { p: ProviderInfo }) {
             {copied ? <CheckIcon className="size-4 text-safe" /> : <CopyIcon className="size-4 text-muted-foreground" />}
           </button>
           <p className="flex items-center gap-2 text-muted-foreground text-xs">
-            <LoaderCircleIcon className="size-3.5 animate-spin" /> This updates by itself once you are done.
+            <Spinner className="size-3.5" /> This updates by itself once you are done.
           </p>
         </div>
       )}

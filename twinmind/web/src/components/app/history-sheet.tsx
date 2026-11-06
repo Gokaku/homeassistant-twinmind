@@ -1,11 +1,12 @@
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { api } from "@/lib/api";
 import type { ConversationMeta, ProviderId } from "@/lib/protocol";
 import { deleteConversation, openConversation, renameConversation, toast, useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { DownloadIcon, LoaderCircleIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { DownloadIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import { Logo, PROVIDER_STYLE, ProviderAvatar } from "./brand";
 import { confirmDialog, promptDialog } from "./dialogs";
@@ -186,7 +187,7 @@ function ImportSection({ onImported }: { onImported: (id: string) => void }) {
       </div>
       {open && (
         <div className="px-1">
-          {!sessions && <LoaderCircleIcon className="mx-auto my-4 size-4 animate-spin text-muted-foreground" />}
+          {!sessions && <Spinner className="mx-auto my-4 size-4 text-muted-foreground" />}
           {sessions?.length === 0 && <p className="px-3 py-3 text-muted-foreground text-xs">No other {PROVIDER_STYLE[open].name} sessions in /config.</p>}
           {sessions?.map((s) => (
             <button
@@ -200,7 +201,7 @@ function ImportSection({ onImported }: { onImported: (id: string) => void }) {
                 <span className="block truncate text-sm">{s.title}</span>
                 <span className="block text-muted-foreground text-xs">{time(s.updatedAt)}</span>
               </span>
-              {busy === s.id && <LoaderCircleIcon className="size-4 animate-spin" />}
+              {busy === s.id && <Spinner className="size-4" />}
             </button>
           ))}
         </div>

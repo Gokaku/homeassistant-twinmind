@@ -37,6 +37,10 @@ const RISK_DOT: Record<ModeInfo["risk"], string> = {
   danger: "bg-danger",
 };
 
+// Browser speech recognition (Chrome, Edge, Safari). Without it the mic could only record
+// audio for a transcription service we do not have, so it is hidden instead of greyed out.
+const canDictate = typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+
 const isTouch = () => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
 
 export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () => void; suggestion: { text: string; n: number } | null }) {
@@ -137,6 +141,7 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
         <PromptInputFooter className="gap-1 px-2 pb-2">
           <PromptInputTools className="min-w-0 gap-0.5">
             <AttachButton />
+            {canDictate && (
             <SpeechInput
               // It sits inside the form: without type="button" it would submit the message.
               type="button"
@@ -150,6 +155,7 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
                 controller.textInput.setInput(cur ? `${cur.replace(/\s+$/, "")} ${t}` : t);
               }}
             />
+            )}
             {info && (
               <PromptInputSelect value={mode} onValueChange={(v) => setMode(providerId, v)}>
                 <PromptInputSelectTrigger className="h-8 min-w-0 gap-1.5 rounded-full px-2.5 text-xs" aria-label="Permission mode">
