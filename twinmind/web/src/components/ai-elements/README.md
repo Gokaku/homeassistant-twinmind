@@ -7,4 +7,3 @@ Local changes (marked "Twinmind:" in the code):
 - prompt-input.tsx: `accept` also matches file extensions such as `.yaml`.
 - speech-input.tsx: idle button style is a ghost button.
 - prompt-input.tsx: `submitOnEnter` option on PromptInputTextarea (phones: Enter = new line).
-- terminal.tsx: uses our own small ANSI renderer (ansi.tsx) instead of ansi-to-react (linkify-it ReDoS).
