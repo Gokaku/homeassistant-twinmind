@@ -77,6 +77,18 @@ export function findProjectCodexConfig(cwd: string): string | null {
   }
 }
 
+/**
+ * The sandbox for one turn, in the shape turn/start expects. It must be sent with every turn:
+ * thread/resume ignores sandbox overrides for a thread the app-server already has loaded,
+ * so without this a chat that once ran in Full access would stay unsandboxed.
+ */
+export function sandboxPolicyFor(mode: string, cwd: string): Record<string, unknown> {
+  const sandbox = (MODES.find((m) => m.id === mode) ?? MODES[1]).sandbox;
+  if (sandbox === "danger-full-access") return { type: "dangerFullAccess" };
+  if (sandbox === "read-only") return { type: "readOnly", networkAccess: false };
+  return { type: "workspaceWrite", writableRoots: [cwd], networkAccess: false, excludeTmpdirEnvVar: false, excludeSlashTmp: false };
+}
+
 export class CodexProvider implements Provider {
   readonly id = "codex" as const;
   readonly label = "Codex";
@@ -212,7 +224,13 @@ export class CodexProvider implements Provider {
       this.turns.set(threadId, turn);
       ctx.signal.addEventListener("abort", onAbort, { once: true });
       rpc
-        .call("turn/start", { threadId, input, approvalPolicy: policy.approvalPolicy, model: ctx.model || null })
+        .call("turn/start", {
+          threadId,
+          input,
+          approvalPolicy: policy.approvalPolicy,
+          sandboxPolicy: sandboxPolicyFor(ctx.mode, ctx.cwd),
+          model: ctx.model || null,
+        })
         .then((r) => {
           turn.turnId = r?.turn?.id ?? null;
           if (ctx.signal.aborted) onAbort();
