@@ -4,7 +4,6 @@ import { Logo } from "@/components/app/brand";
 import { Composer } from "@/components/app/composer";
 import { DialogHost } from "@/components/app/dialogs";
 import { ConversationList, HistorySheet } from "@/components/app/history-sheet";
-import { ProviderSwitch } from "@/components/app/provider-switch";
 import { Thread } from "@/components/app/thread";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
@@ -78,12 +77,7 @@ function Header({ onMenu, onAccounts }: { onMenu: () => void; onAccounts: () => 
           <TooltipContent>Conversations</TooltipContent>
         </Tooltip>
         <div className="flex min-w-0 items-center justify-center gap-2 overflow-hidden">
-          {title ? (
-            <span className="hidden truncate font-medium text-sm md:block">{title}</span>
-          ) : (
-            <Logo className="hidden size-6 md:block lg:hidden" />
-          )}
-          <ProviderSwitch className="md:ml-3" />
+          <span className="truncate font-medium text-sm">{title ?? "Twinmind"}</span>
         </div>
         <div className="flex items-center">
           {hasChat && (
