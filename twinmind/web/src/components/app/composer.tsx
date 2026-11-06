@@ -1,4 +1,4 @@
-import { Attachment, AttachmentPreview, AttachmentRemove, Attachments } from "@/components/ai-elements/attachments";
+import { Attachment, AttachmentInfo, AttachmentPreview, AttachmentRemove, Attachments } from "@/components/ai-elements/attachments";
 import {
   Context,
   ContextCacheUsage,
@@ -298,7 +298,12 @@ const PromptInputAttachmentsDisplay = () => {
       {attachments.files.map((a) => (
         <Attachment key={a.id} data={a} onRemove={() => attachments.remove(a.id)}>
           <AttachmentPreview />
-          <AttachmentRemove />
+          <AttachmentInfo className="max-w-32" />
+          {/* Upstream shows it on hover only: keep it visible on touch screens and when focused. */}
+          <AttachmentRemove
+            label={`Remove ${a.filename ?? "attachment"}`}
+            className="focus-visible:opacity-100 pointer-coarse:opacity-100"
+          />
         </Attachment>
       ))}
     </Attachments>
