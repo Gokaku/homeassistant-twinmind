@@ -186,6 +186,9 @@ function handle(e: ServerEvent) {
       upsertMeta(e.meta);
       break;
     }
+    case "snapshot":
+      set({ details: { ...state.details, [e.conversation.id]: e.conversation } });
+      break;
     case "conversation.deleted": {
       const { [e.id]: _, ...rest } = state.details;
       set({
@@ -245,6 +248,10 @@ export async function refreshConversations() {
 }
 
 export async function loadConversation(id: string) {
+  // Preferred: ask on the event socket. The snapshot then arrives in order with the live
+  // events, so text streamed while loading is neither lost nor applied twice.
+  if (send({ type: "subscribe", conversationId: id })) return;
+  // Not connected: nothing is streaming to us anyway, plain HTTP is fine.
   try {
     const r = await api<{ conversation: Conversation }>(`conversations/${id}`);
     set({ details: { ...state.details, [id]: r.conversation } });
