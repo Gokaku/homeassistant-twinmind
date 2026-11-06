@@ -10,10 +10,12 @@ export default defineConfig({
   base: "./",
   plugins: [react(), tailwindcss()],
   resolve: {
-    alias: {
-      "@": path.resolve(import.meta.dirname, "src"),
-      "@shared": path.resolve(import.meta.dirname, "../server/src"),
-    },
+    alias: [
+      { find: "@shared", replacement: path.resolve(import.meta.dirname, "../server/src") },
+      { find: "@", replacement: path.resolve(import.meta.dirname, "src") },
+      // Exact match only. See src/lib/shims/ansi-to-react.ts (CommonJS default-export interop).
+      { find: /^ansi-to-react$/, replacement: path.resolve(import.meta.dirname, "src/lib/shims/ansi-to-react.ts") },
+    ],
   },
   build: {
     outDir: "dist",
