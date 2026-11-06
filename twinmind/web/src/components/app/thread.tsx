@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { memo, useState } from "react";
 import { Logo, PROVIDER_STYLE, ProviderAvatar } from "./brand";
+import { QuestionCard } from "./question-card";
 import { ToolCard } from "./tool-card";
 
 const SUGGESTIONS = [
@@ -153,7 +154,11 @@ function PartView({ part, provider, streaming }: { part: Part; provider: Provide
         </Reasoning>
       );
     case "tool":
+      // AskUserQuestion is shown as a question card instead.
+      if (part.name === "AskUserQuestion") return null;
       return <ToolCard part={part} provider={provider} />;
+    case "question":
+      return <QuestionCard part={part} />;
     case "todo": {
       const done = part.items.filter((i) => i.status === "completed").length;
       return (

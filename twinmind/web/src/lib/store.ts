@@ -360,6 +360,10 @@ export function approve(approvalId: string, decision: ApprovalDecision) {
   if (!send({ type: "approve", approvalId, decision })) toast("Not connected");
 }
 
+export function answerQuestion(questionPartId: string, answers: Record<string, string[]> | null) {
+  if (!send({ type: "answer", questionPartId, answers })) toast("Not connected");
+}
+
 export function interrupt(conversationId: string) {
   send({ type: "interrupt", conversationId });
 }
