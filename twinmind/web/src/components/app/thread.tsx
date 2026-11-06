@@ -21,7 +21,7 @@ import {
 } from "@/components/ai-elements/queue";
 import { uploadUrl } from "@/lib/api";
 import type { ChatMessage, Part, ProviderId } from "@/lib/protocol";
-import { useStore } from "@/lib/store";
+import { toast, useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangleIcon,
@@ -217,10 +217,13 @@ function CopyAction({ text }: { text: string }) {
     <MessageAction
       label="Copy answer"
       onClick={() => {
-        void navigator.clipboard?.writeText(text).then(() => {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        });
+        navigator.clipboard.writeText(text).then(
+          () => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          },
+          () => toast("Could not copy the answer."),
+        );
       }}
     >
       {copied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
