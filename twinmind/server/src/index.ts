@@ -10,10 +10,13 @@ import { MockProvider } from "./providers/mock.js";
 import type { Provider } from "./providers/types.js";
 import { ConversationStore } from "./store.js";
 import { UploadStore } from "./uploads.js";
+import { silenceKnownWarnings } from "./warnings.js";
 
 // Log stray promise rejections instead of exiting (Node's default), so one bad event cannot
 // kill every running chat. Real crashes still exit; the Supervisor watchdog restarts us.
 process.on("unhandledRejection", (e) => console.error("[twinmind] unhandled rejection:", e));
+
+silenceKnownWarnings();
 
 const config = loadConfig();
 
