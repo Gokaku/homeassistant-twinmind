@@ -122,6 +122,9 @@ function projectNotes(cwd: string): string {
 }
 
 interface StreamState {
+  /** Usage of the current API message (from message_start / message_delta). */
+  usage?: { input: number; cacheRead: number; cacheWrite: number; output: number };
+  contextWindow?: number;
   toolParts: Map<string, Extract<Part, { type: "tool" }>>;
   streamed: Set<string>;
   blockPart: Map<string, string>;
@@ -388,6 +391,10 @@ export class ClaudeProvider implements Provider {
         if (ctx.signal.aborted) break;
         this.handle(m, ctx, st);
         if (m.type === "result") {
+          // The main model has the largest context window among the models used.
+          const windows = Object.values((m as any).modelUsage ?? {}).map((x: any) => Number(x?.contextWindow) || 0);
+          if (windows.length) st.contextWindow = Math.max(...windows);
+          this.emitUsage(ctx, st);
           if (m.subtype !== "success" || m.is_error) {
             resultError = (m as any).result || (m as any).errors?.join("\n") || `Claude stopped: ${m.subtype}`;
           }
@@ -408,6 +415,21 @@ export class ClaudeProvider implements Provider {
     return { status: "completed" };
   }
 
+  private emitUsage(ctx: TurnContext, st: StreamState) {
+    const u = st.usage;
+    if (!u) return;
+    ctx.emit({
+      type: "usage",
+      usage: {
+        inputTokens: u.input + u.cacheRead + u.cacheWrite,
+        cachedInputTokens: u.cacheRead,
+        outputTokens: u.output,
+        contextTokens: u.input + u.cacheRead + u.cacheWrite + u.output,
+        contextWindow: st.contextWindow,
+      },
+    });
+  }
+
   private handle(m: SDKMessage, ctx: TurnContext, st: StreamState) {
     const anyM = m as any;
     if (m.type === "system" && anyM.subtype === "init" && anyM.session_id) {
@@ -421,6 +443,18 @@ export class ClaudeProvider implements Provider {
       if (ev.type === "message_start") {
         st.current = ev.message.id;
         st.streamed.add(ev.message.id);
+        const u = ev.message?.usage;
+        if (u) {
+          st.usage = {
+            input: u.input_tokens ?? 0,
+            cacheRead: u.cache_read_input_tokens ?? 0,
+            cacheWrite: u.cache_creation_input_tokens ?? 0,
+            output: u.output_tokens ?? 0,
+          };
+        }
+      } else if (ev.type === "message_delta" && st.usage && ev.usage?.output_tokens != null) {
+        st.usage.output = ev.usage.output_tokens;
+        this.emitUsage(ctx, st);
       } else if (ev.type === "content_block_start") {
         const kind = ev.content_block?.type;
         if (kind === "text" || kind === "thinking") {

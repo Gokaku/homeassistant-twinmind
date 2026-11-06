@@ -255,6 +255,19 @@ describe("WebSocket", () => {
     c.ws.close();
   });
 
+  it("reports token usage and stores it on the reply", async () => {
+    const c = connect(admin);
+    await c.waitFor("hello");
+    c.ws.send(JSON.stringify({ type: "send", clientRequestId: "u1", provider: "mock", mode: "auto", text: "usage please" }));
+    const conv = await c.waitFor("conversation", (e) => e.clientRequestId === "u1");
+    const u = await c.waitFor("usage", (e) => e.conversationId === conv.meta.id);
+    expect(u.usage).toMatchObject({ contextTokens: 19_040, contextWindow: 200_000 });
+    await c.waitFor("turn.end", (e) => e.conversationId === conv.meta.id);
+    const r = await (await fetch(`${base}/api/conversations/${conv.meta.id}`, { headers: admin })).json();
+    expect(r.conversation.messages[1].usage.contextTokens).toBe(19_040);
+    c.ws.close();
+  });
+
   it("rejects unknown modes", async () => {
     const c = connect(admin);
     await c.waitFor("hello");

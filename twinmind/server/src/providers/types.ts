@@ -1,4 +1,5 @@
 import type {
+  TokenUsage,
   Question,
   ApprovalDecision,
   AuthState,
@@ -16,7 +17,8 @@ export type ProviderEvent =
   | { type: "text-delta"; partId: string; delta: string }
   | { type: "reasoning-delta"; partId: string; delta: string }
   /** Insert or replace a whole part (tool updates, todo lists, notices...). */
-  | { type: "part"; part: Part };
+  | { type: "part"; part: Part }
+  | { type: "usage"; usage: TokenUsage };
 
 export interface ApprovalRequest {
   /** The tool part this approval belongs to (created if it does not exist yet). */

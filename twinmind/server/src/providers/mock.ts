@@ -143,6 +143,7 @@ export class MockProvider implements Provider {
         state: "completed",
       },
     });
+    emit({ type: "usage", usage: { inputTokens: 18_400, cachedInputTokens: 12_000, outputTokens: 640, contextTokens: 19_040, contextWindow: 200_000 } });
     const files = ctx.attachments.length ? ` I also received ${ctx.attachments.map((a) => a.name).join(", ")}.` : "";
     await stream(
       "text-delta",

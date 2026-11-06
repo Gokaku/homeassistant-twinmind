@@ -72,6 +72,17 @@ export interface QuestionPart {
 }
 export type Part = TextPart | ReasoningPart | ToolPart | TodoPart | FilePart | NoticePart | QuestionPart;
 
+/** Token usage of the latest model call in a reply. */
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens?: number;
+  cachedInputTokens?: number;
+  /** Tokens currently in the model's context window. */
+  contextTokens: number;
+  contextWindow?: number;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -82,6 +93,7 @@ export interface ChatMessage {
   parts: Part[];
   createdAt: number;
   status?: "streaming" | "completed" | "interrupted" | "failed";
+  usage?: TokenUsage;
 }
 
 export interface ConversationMeta {
@@ -175,6 +187,7 @@ export type ServerEvent =
   | { type: "message"; conversationId: string; message: ChatMessage }
   | { type: "text.delta"; conversationId: string; messageId: string; partId: string; delta: string }
   | { type: "reasoning.delta"; conversationId: string; messageId: string; partId: string; delta: string }
+  | { type: "usage"; conversationId: string; messageId: string; usage: TokenUsage }
   | { type: "part"; conversationId: string; messageId: string; part: Part }
   | {
       type: "turn.end";

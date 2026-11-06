@@ -277,6 +277,10 @@ export class ChatService implements ToolGate {
         case "part":
           upsert(e.part);
           break;
+        case "usage":
+          assistant.usage = e.usage;
+          this.broadcast({ type: "usage", conversationId: cid, messageId: mid, usage: e.usage });
+          break;
       }
     };
 

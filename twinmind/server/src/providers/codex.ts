@@ -405,6 +405,22 @@ export class CodexProvider implements Provider {
         }
         break;
       }
+      case "thread/tokenUsage/updated": {
+        const last = p.tokenUsage?.last;
+        if (!last) break;
+        emit({
+          type: "usage",
+          usage: {
+            inputTokens: last.inputTokens ?? 0,
+            cachedInputTokens: last.cachedInputTokens ?? 0,
+            outputTokens: last.outputTokens ?? 0,
+            reasoningTokens: last.reasoningOutputTokens ?? 0,
+            contextTokens: last.totalTokens ?? (last.inputTokens ?? 0) + (last.outputTokens ?? 0),
+            contextWindow: p.tokenUsage?.modelContextWindow ?? undefined,
+          },
+        });
+        break;
+      }
       case "turn/plan/updated": {
         const status = (s: string) => (s === "inProgress" ? "in_progress" : s === "completed" ? "completed" : "pending");
         emit({
