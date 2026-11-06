@@ -9,6 +9,9 @@ import { agentEnv } from "./env.js";
 import { stringifyOutput, truncate } from "./tooltext.js";
 import type { NativeSession, Provider, TurnContext } from "./types.js";
 
+/** Environment variable the app-server reads the MCP bearer secret from. */
+const MCP_SECRET_VAR = "TWINMIND_MCP_SECRET";
+
 type Policy = { approvalPolicy: string; sandbox: "read-only" | "workspace-write" | "danger-full-access" };
 
 const MODES: (ModeInfo & Policy)[] = [
@@ -89,6 +92,28 @@ export function sandboxPolicyFor(mode: string, cwd: string): Record<string, unkn
   return { type: "workspaceWrite", writableRoots: [cwd], networkAccess: false, excludeTmpdirEnvVar: false, excludeSlashTmp: false };
 }
 
+/** Config overrides for thread/start and thread/resume. */
+export function threadConfig(mcp: { url: string } | undefined): Record<string, unknown> {
+  return {
+    // The app-server needs the MCP secret in its environment (bearer_token_env_var), but the
+    // commands Codex runs inherit that environment: keep the secret out of theirs.
+    shell_environment_policy: { exclude: [MCP_SECRET_VAR] },
+    ...(mcp
+      ? {
+          // Twinmind's Home Assistant tools; the bearer secret is read from the app-server's environment.
+          mcp_servers: {
+            [HA_MCP_SERVER]: {
+              url: mcp.url,
+              bearer_token_env_var: MCP_SECRET_VAR,
+              // Changes wait for the user's approval in the app: give them time.
+              tool_timeout_sec: 1800,
+            },
+          },
+        }
+      : {}),
+  };
+}
+
 export class CodexProvider implements Provider {
   readonly id = "codex" as const;
   readonly label = "Codex";
@@ -106,7 +131,7 @@ export class CodexProvider implements Provider {
     const bin = this.opts.bin ?? findCodexBinary();
     if (!bin) throw new Error("Codex binary not found");
     // Codex reads the MCP bearer secret from its environment; nothing else secret is passed.
-    const rpc = new CodexRpc(bin, () => agentEnv({ TWINMIND_MCP_SECRET: process.env.TWINMIND_MCP_SECRET }));
+    const rpc = new CodexRpc(bin, () => agentEnv({ [MCP_SECRET_VAR]: process.env[MCP_SECRET_VAR] }));
     rpc.on("notification", (method: string, params: any) => this.onNotification(method, params));
     rpc.on("request", (req: ServerRequestMsg) =>
       this.onRequest(req).catch((e) => console.warn(`[twinmind] Codex request ${req.method} failed: ${e?.message ?? e}`)),
@@ -184,15 +209,8 @@ export class CodexProvider implements Provider {
       sandbox: policy.sandbox,
       model: ctx.model || null,
       developerInstructions: HA_INSTRUCTIONS,
-      // Twinmind's Home Assistant tools; the bearer secret is read from the app-server's environment.
-      config: ctx.mcp
-        ? { mcp_servers: { [HA_MCP_SERVER]: {
-                url: ctx.mcp.url,
-                bearer_token_env_var: "TWINMIND_MCP_SECRET",
-                // Changes wait for the user's approval in the app: give them time.
-                tool_timeout_sec: 1800,
-              } } }
-        : undefined,
+      // Home Assistant tools, and the MCP secret kept out of the commands Codex runs.
+      config: threadConfig(ctx.mcp),
     };
     let started: any = null;
     if (ctx.nativeId) {

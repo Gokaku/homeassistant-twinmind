@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { findProjectCodexConfig, sandboxPolicyFor } from "./codex.js";
+import { findProjectCodexConfig, sandboxPolicyFor, threadConfig } from "./codex.js";
 
 describe("findProjectCodexConfig", () => {
   it("finds a project config in the working directory or a parent", () => {
@@ -28,5 +28,17 @@ describe("sandboxPolicyFor", () => {
     expect(sandboxPolicyFor("full-access", "/config")).toEqual({ type: "dangerFullAccess" });
     // Unknown modes fall back to the default (sandboxed), never to full access.
     expect(sandboxPolicyFor("nonsense", "/config")).toMatchObject({ type: "workspaceWrite" });
+  });
+});
+
+describe("threadConfig", () => {
+  it("keeps the MCP secret out of the commands Codex runs", () => {
+    // Verified with codex 0.166: without this, `env` in any Codex command printed the secret.
+    for (const mcp of [undefined, { url: "http://127.0.0.1:1/mcp/token" }]) {
+      expect(threadConfig(mcp)).toMatchObject({ shell_environment_policy: { exclude: ["TWINMIND_MCP_SECRET"] } });
+    }
+    expect(threadConfig({ url: "http://127.0.0.1:1/mcp/token" })).toMatchObject({
+      mcp_servers: { homeassistant: { url: "http://127.0.0.1:1/mcp/token", bearer_token_env_var: "TWINMIND_MCP_SECRET" } },
+    });
   });
 });
