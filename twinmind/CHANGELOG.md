@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.2
 
 Security audit of 0.3.1 and a UI check (details in SECURITY.md).
 
