@@ -216,7 +216,9 @@ export function createApp(deps: AppDeps) {
     const inline = u.mediaType.startsWith("image/");
     res.setHeader("Content-Type", inline ? u.mediaType : "application/octet-stream");
     res.setHeader("Content-Disposition", `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(u.name)}`);
-    fs.createReadStream(u.path).pipe(res);
+    const stream = fs.createReadStream(u.path);
+    stream.on("error", () => (res.headersSent ? res.destroy() : res.status(404).end()));
+    stream.pipe(res);
   });
 
   api.use((_req, res) => res.status(404).json({ error: "Not found" }));
@@ -306,6 +308,11 @@ export function createApp(deps: AppDeps) {
       } catch (e: any) {
         send({ type: "error", message: e?.message ?? "Request failed", clientRequestId: (msg as any).clientRequestId });
       }
+    });
+    // Without an error listener, an oversized or malformed frame would crash the process.
+    ws.on("error", (err) => {
+      console.warn(`[twinmind] WebSocket error: ${err.message}`);
+      ws.terminate();
     });
     ws.on("close", () => {
       clearInterval(heartbeat);

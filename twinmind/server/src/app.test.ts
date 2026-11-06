@@ -210,6 +210,16 @@ describe("WebSocket", () => {
     c.ws.close();
   });
 
+  it("survives a WebSocket frame over the size limit", async () => {
+    const c = connect(admin);
+    await c.waitFor("hello");
+    const closed = new Promise((r) => c.ws.on("close", r));
+    c.ws.send("x".repeat(1024 * 1024 + 10));
+    await closed;
+    // The server is still up.
+    expect((await fetch(`${base}/api/me`, { headers: admin })).status).toBe(200);
+  });
+
   it("rejects unknown modes", async () => {
     const c = connect(admin);
     await c.waitFor("hello");
