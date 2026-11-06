@@ -102,5 +102,9 @@ trademarks of OpenAI. This project is not affiliated with either.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). The copied AI Elements components are Apache-2.0 and the
-shadcn/ui components MIT; their licenses are next to them.
+Copyright (C) 2026 Gokaku. Twinmind is free software under the GNU General Public License,
+version 3 or (at your option) any later version, see [LICENSE](LICENSE). You may use, change
+and share it, but modified versions you share must stay under the GPL with their source.
+
+The copied AI Elements components are Apache-2.0 and the shadcn/ui components MIT; their
+licenses are next to them.
