@@ -13,8 +13,8 @@ receives the transcript and carries on.
 2. Install **Twinmind**, start it, and open it from the sidebar.
 3. Sign in to Claude and/or Codex from the person icon. See [DOCS.md](twinmind/DOCS.md).
 
-> **Status: 0.1.0, untested on a real Home Assistant.** It has only been run in development
-> with a mock assistant. Expect rough edges and please report what breaks.
+> **Status: early (0.3.x), not yet tested on a real Home Assistant installation.** Expect
+> rough edges and please report what breaks.
 
 ## Features
 
@@ -30,8 +30,6 @@ receives the transcript and carries on.
 - Phone and desktop layouts; dark and light theme; safe areas and on-screen keyboard handled.
 
 ## Security model
-
-Full threat model, audit findings and open items: [SECURITY.md](SECURITY.md).
 
 - The server only accepts connections from the Supervisor ingress proxy (`172.30.32.2`).
   Not even loopback: the assistants run commands inside the container and must not be able
@@ -50,6 +48,9 @@ Full threat model, audit findings and open items: [SECURITY.md](SECURITY.md).
   Supervisor API limited to the `homeassistant` role (core log).
 - The assistants run as root inside the add-on container. In *Bypass* / *Full access* they can
   run any command there. Use these modes deliberately.
+
+Please report security issues privately (GitHub → Security → Report a vulnerability), not
+in public issues.
 
 ## Development
 

@@ -2,7 +2,7 @@
 
 ## 0.3.2
 
-Security audit of 0.3.1 and a UI check (details in SECURITY.md).
+Security audit of 0.3.1 and a UI check.
 
 - Security: Codex sub-agents and goals are turned off; they kept running after a reply
   ended, with the sandbox of the earlier turn.
