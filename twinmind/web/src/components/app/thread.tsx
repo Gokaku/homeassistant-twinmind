@@ -154,7 +154,7 @@ function PartView({ part, provider, streaming }: { part: Part; provider: Provide
     case "reasoning":
       return (
         <Reasoning isStreaming={streaming && !part.done} defaultOpen={false}>
-          <ReasoningTrigger />
+          <ReasoningTrigger getThinkingMessage={thinkingMessage} />
           <ReasoningContent>{part.text}</ReasoningContent>
         </Reasoning>
       );
@@ -202,6 +202,13 @@ function PartView({ part, provider, streaming }: { part: Part; provider: Provide
     case "file":
       return <FileChip part={part} />;
   }
+}
+
+/** The upstream default reads "Thought for 1 seconds". */
+function thinkingMessage(isStreaming: boolean, duration?: number) {
+  if (isStreaming || duration === 0) return <Shimmer duration={1}>Thinking...</Shimmer>;
+  if (duration === undefined) return <p>Thought for a few seconds</p>;
+  return <p>Thought for {duration === 1 ? "1 second" : `${duration} seconds`}</p>;
 }
 
 function CopyAction({ text }: { text: string }) {
