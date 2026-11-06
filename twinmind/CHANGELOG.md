@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.3
+
+- Claude's thinking is shown again (the Thinking block was empty).
+
 ## 0.3.2
 
 Security audit of 0.3.1 and a UI check.
