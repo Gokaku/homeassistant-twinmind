@@ -9,6 +9,9 @@ export const PROVIDER_STYLE: Record<ProviderId, { icon: LucideIcon; text: string
   mock: { icon: FlaskConicalIcon, text: "text-mock", bg: "bg-mock", soft: "bg-mock/15", ring: "ring-mock/40", name: "Mock" },
 };
 
+/** models.dev logo slug per assistant, for the AI Elements ModelSelectorLogo. */
+export const PROVIDER_LOGO: Record<ProviderId, string> = { claude: "anthropic", codex: "openai", mock: "vercel" };
+
 export function ProviderAvatar({ provider, className, pulse }: { provider: ProviderId; className?: string; pulse?: boolean }) {
   const s = PROVIDER_STYLE[provider];
   const Icon = s.icon;
