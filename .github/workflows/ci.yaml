@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Server tests
+        working-directory: twinmind/server
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm test
+      - name: Web build
+        working-directory: twinmind/web
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+  image:
+    runs-on: ubuntu-latest
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+          - arch: aarch64
+            platform: linux/arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build add-on image (not pushed)
+        uses: docker/build-push-action@v6
+        with:
+          context: twinmind
+          platforms: ${{ matrix.platform }}
+          build-args: BUILD_FROM=ghcr.io/home-assistant/${{ matrix.arch }}-base:3.22
+          push: false
+          load: true
+          tags: twinmind:test-${{ matrix.arch }}
+      - name: Smoke test
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} --entrypoint /bin/sh twinmind:test-${{ matrix.arch }} -c '
+            set -e
+            node --version
+            cd /opt/twinmind/server
+            node -e "import(\"./dist/providers/claude.js\").then(m => { const b = m.findClaudeBinary(); if (!b) throw new Error(\"no claude binary\"); console.log(b) })"
+            node -e "import(\"./dist/providers/codex-rpc.js\").then(m => { const b = m.findCodexBinary(); if (!b) throw new Error(\"no codex binary\"); console.log(b) })"
+            $(node -e "import(\"./dist/providers/claude.js\").then(m => console.log(m.findClaudeBinary()))") --version
+            $(node -e "import(\"./dist/providers/codex-rpc.js\").then(m => console.log(m.findCodexBinary()))") --version
+            which script bwrap git rg
+            test -f /opt/twinmind/web/dist/index.html
+          '

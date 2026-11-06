@@ -1,0 +1,4 @@
+configuration:
+  debug:
+    name: Debug logging
+    description: Log the raw output of the Claude and Codex processes to the add-on log.

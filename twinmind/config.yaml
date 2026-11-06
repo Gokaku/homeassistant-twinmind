@@ -1,0 +1,44 @@
+name: Twinmind
+version: "0.2.0"
+slug: twinmind
+description: Chat with Claude and Codex about your Home Assistant setup, from any phone.
+url: https://github.com/Gokaku/homeassistant-twinmind
+arch:
+  - aarch64
+  - amd64
+init: false
+startup: application
+boot: auto
+
+# The UI is only reachable through Home Assistant ingress. No ports are published.
+ingress: true
+ingress_port: 8099
+ingress_stream: true
+panel_icon: mdi:head-sync-outline
+panel_title: Twinmind
+# Hides the sidebar entry from non-admins. The real admin check is done by the server.
+panel_admin: true
+
+# Core API: admin check, and the Home Assistant tools (entities, services, registries, automations).
+homeassistant_api: true
+# Supervisor API with the "homeassistant" role: only /core/* (the raw Home Assistant log).
+# Not "manager": Twinmind does not manage add-ons, backups or the host.
+hassio_api: true
+hassio_role: homeassistant
+
+# Least privilege: only the Home Assistant configuration folder is mapped.
+map:
+  - type: homeassistant_config
+    read_only: false
+    path: /config
+
+backup_exclude:
+  - "home/.cache/**"
+  - "home/.npm/**"
+  - "codex/tmp/**"
+  - "codex/log/**"
+
+options:
+  debug: false
+schema:
+  debug: bool
