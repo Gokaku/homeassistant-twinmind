@@ -195,7 +195,9 @@ export class ChatService implements ToolGate {
     this.broadcast({ type: "conversation", meta: this.metaWithStatus(conv), clientRequestId: msg.clientRequestId });
     this.broadcast({ type: "message", conversationId: conv.id, message: userMsg });
     this.broadcast({ type: "message", conversationId: conv.id, message: assistant });
-    await this.store.save(conv);
+    // A failed save (disk full, ...) must not leave the chat marked as running forever:
+    // the turn still runs, and the end of the turn saves again.
+    await this.store.save(conv).catch((e) => console.warn(`[twinmind] could not save conversation ${conv.id}: ${e?.message ?? e}`));
 
     const prompt = buildPrompt(conv, history, msg.provider, text || "(see attached files)");
     void this.runTurn(conv, provider, assistant, prompt, attachments, msg.mode, model, controller);
