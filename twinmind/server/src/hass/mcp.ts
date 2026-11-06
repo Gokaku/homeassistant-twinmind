@@ -14,7 +14,10 @@ export type GateDecision = { ok: true } | { ok: false; reason: string };
 /** Links an MCP token to a conversation and decides whether a write tool may run. */
 export interface ToolGate {
   /** Returns null if the token is unknown (then the request is refused). */
-  session(token: string): { decide(tool: HaTool, args: unknown, summary: string): Promise<GateDecision> } | null;
+  session(token: string): {
+    /** `signal` aborts when the MCP request goes away (client timeout/disconnect): cancel the approval. */
+    decide(tool: HaTool, args: unknown, summary: string, signal?: AbortSignal): Promise<GateDecision>;
+  } | null;
 }
 
 export interface McpEndpoint {
@@ -66,6 +69,12 @@ export async function startMcpEndpoint(opts: { ha: HassClient | null; gate: Tool
       return deny(400, "Invalid JSON");
     }
 
+    // Aborted if the client gives up before we answered: a pending approval must not
+    // still apply a change after the assistant was told the call failed.
+    const gone = new AbortController();
+    res.on("close", () => {
+      if (!res.writableFinished) gone.abort();
+    });
     const mcp = new McpServer({ name: MCP_SERVER_NAME, version: "0.1.0" });
     for (const t of HA_TOOLS) {
       mcp.registerTool(
@@ -80,8 +89,9 @@ export async function startMcpEndpoint(opts: { ha: HassClient | null; gate: Tool
           try {
             if (!opts.ha) throw new Error("The Home Assistant API is not available (no Supervisor token).");
             if (!t.readOnly) {
-              const d = await session.decide(t, args, t.summary(args));
+              const d = await session.decide(t, args, t.summary(args), gone.signal);
               if (!d.ok) return { content: [{ type: "text" as const, text: d.reason }], isError: true };
+              if (gone.signal.aborted) throw new Error("The request was cancelled.");
             }
             const result = await t.run(opts.ha, args);
             return { content: [{ type: "text" as const, text: formatResult(result ?? { ok: true }) }] };

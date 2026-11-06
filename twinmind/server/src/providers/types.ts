@@ -25,6 +25,8 @@ export interface ApprovalRequest {
   title: string;
   input?: unknown;
   reason?: string;
+  /** Cancels the request (the card is closed as denied), e.g. when the tool call timed out. */
+  signal?: AbortSignal;
 }
 
 export interface TurnContext {

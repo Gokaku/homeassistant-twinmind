@@ -10,6 +10,8 @@ let client: HassClient;
 let endpoint: McpEndpoint;
 const TOKEN = "conversation-token-123456";
 let nextDecision: GateDecision = { ok: true };
+/** When set, decide() waits for the request's abort signal instead of answering. */
+let waitForAbort: ((aborted: boolean) => void) | null = null;
 const asked: string[] = [];
 
 beforeAll(async () => {
@@ -20,8 +22,14 @@ beforeAll(async () => {
       session: (t) =>
         t === TOKEN
           ? {
-              decide: async (tool, _args, summary) => {
+              decide: async (tool, _args, summary, signal) => {
                 asked.push(`${tool.name}: ${summary}`);
+                if (waitForAbort) {
+                  const report = waitForAbort;
+                  await new Promise<void>((r) => signal?.addEventListener("abort", () => r(), { once: true }));
+                  report(!!signal?.aborted);
+                  return { ok: true };
+                }
                 return nextDecision;
               },
             }
@@ -105,6 +113,32 @@ describe("Home Assistant MCP endpoint", () => {
     const got = JSON.parse(text(await c.callTool({ name: "ha_get_automation", arguments: { entity_id: "automation.night" } })));
     expect(got.config.alias).toBe("Night mode");
     await c.close();
+  });
+
+  it("cancels a pending approval when the client disconnects, and does not run the change", async () => {
+    const aborted = new Promise<boolean>((r) => (waitForAbort = r));
+    const before = ha.state.serviceCalls.length;
+    const ac = new AbortController();
+    const call = fetch(endpoint.url(TOKEN), {
+      method: "POST",
+      signal: ac.signal,
+      headers: { Authorization: `Bearer ${endpoint.secret}`, "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: "ha_call_service", arguments: { domain: "light", service: "turn_off", target: { entity_id: "light.kitchen" } } },
+      }),
+    }).catch(() => "aborted");
+    setTimeout(() => ac.abort(), 300);
+    expect(await call).toBe("aborted");
+    try {
+      expect(await Promise.race([aborted, new Promise((r) => setTimeout(() => r("no abort seen"), 2000))])).toBe(true);
+    } finally {
+      waitForAbort = null;
+    }
+    await new Promise((r) => setTimeout(r, 100));
+    expect(ha.state.serviceCalls.length).toBe(before);
   });
 
   it("rejects invalid service names", async () => {

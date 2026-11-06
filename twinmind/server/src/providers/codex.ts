@@ -186,7 +186,12 @@ export class CodexProvider implements Provider {
       developerInstructions: HA_INSTRUCTIONS,
       // Twinmind's Home Assistant tools; the bearer secret is read from the app-server's environment.
       config: ctx.mcp
-        ? { mcp_servers: { [HA_MCP_SERVER]: { url: ctx.mcp.url, bearer_token_env_var: "TWINMIND_MCP_SECRET" } } }
+        ? { mcp_servers: { [HA_MCP_SERVER]: {
+                url: ctx.mcp.url,
+                bearer_token_env_var: "TWINMIND_MCP_SECRET",
+                // Changes wait for the user's approval in the app: give them time.
+                tool_timeout_sec: 1800,
+              } } }
         : undefined,
     };
     const started = ctx.nativeId

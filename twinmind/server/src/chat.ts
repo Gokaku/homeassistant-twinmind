@@ -72,10 +72,20 @@ export class ChatService implements ToolGate {
     const cid = this.tokenOwners.get(token);
     const turn = cid ? this.running.get(cid) : undefined;
     if (!cid || !turn) return null;
-    return { decide: (tool: HaTool, args: unknown, summary: string) => this.decideHaTool(cid, turn, tool, args, summary) };
+    return {
+      decide: (tool: HaTool, args: unknown, summary: string, signal?: AbortSignal) =>
+        this.decideHaTool(cid, turn, tool, args, summary, signal),
+    };
   }
 
-  private async decideHaTool(cid: string, turn: RunningTurn, tool: HaTool, args: unknown, summary: string): Promise<GateDecision> {
+  private async decideHaTool(
+    cid: string,
+    turn: RunningTurn,
+    tool: HaTool,
+    args: unknown,
+    summary: string,
+    signal?: AbortSignal,
+  ): Promise<GateDecision> {
     if (turn.controller.signal.aborted) return { ok: false, reason: "The user stopped this reply." };
     const policy = haPolicy(turn.provider, turn.mode);
     if (policy === "allow") return { ok: true };
@@ -101,7 +111,9 @@ export class ChatService implements ToolGate {
       title: summary,
       input: args,
       reason: tool.title,
+      signal,
     });
+    if (signal?.aborted) return { ok: false, reason: "The tool call was cancelled before it was approved." };
     if (decision === "deny") return { ok: false, reason: "The user declined this change." };
     if (decision === "allow-session") {
       if (!this.sessionAllowed.has(cid)) this.sessionAllowed.set(cid, new Set());
@@ -268,7 +280,7 @@ export class ChatService implements ToolGate {
 
     const requestApproval: import("./providers/types.js").TurnContext["requestApproval"] = (req) =>
       new Promise<ApprovalDecision>((resolve) => {
-        if (controller.signal.aborted) return resolve("deny");
+        if (controller.signal.aborted || req.signal?.aborted) return resolve("deny");
         const approvalId = randomUUID();
         const existing = assistant.parts.find((p) => p.id === req.toolPartId) as ToolPart | undefined;
         const part: ToolPart = {
@@ -287,6 +299,7 @@ export class ChatService implements ToolGate {
         const done = (d: ApprovalDecision) => {
           if (!this.approvals.delete(approvalId)) return;
           controller.signal.removeEventListener("abort", onAbort);
+          req.signal?.removeEventListener("abort", onAbort);
           const current = assistant.parts.find((p) => p.id === req.toolPartId) as ToolPart | undefined;
           if (current) {
             upsert({
@@ -299,6 +312,7 @@ export class ChatService implements ToolGate {
         };
         const onAbort = () => done("deny");
         controller.signal.addEventListener("abort", onAbort, { once: true });
+        req.signal?.addEventListener("abort", onAbort, { once: true });
         this.approvals.set(approvalId, { conversationId: cid, messageId: mid, partId: req.toolPartId, resolve: done });
       });
 
