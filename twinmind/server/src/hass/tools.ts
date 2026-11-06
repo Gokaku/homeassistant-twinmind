@@ -90,17 +90,15 @@ async function configExists(ha: HassClient, kind: string, id: string): Promise<b
   }
 }
 
-function tail(text: string, lines: number, filter?: string): string {
+/**
+ * The last `lines` lines, optionally only those containing one of the `|`-separated terms
+ * (case-insensitive). Plain text on purpose: an assistant-supplied regular expression such as
+ * `(.*a){20}x` backtracks for minutes on one log line and freezes the whole server.
+ */
+export function tail(text: string, lines: number, filter?: string): string {
   let all = String(text ?? "").split("\n");
-  if (filter) {
-    let re: RegExp;
-    try {
-      re = new RegExp(filter, "i");
-    } catch {
-      re = new RegExp(filter.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-    }
-    all = all.filter((l) => re.test(l));
-  }
+  const terms = (filter ?? "").toLowerCase().split("|").filter(Boolean);
+  if (terms.length) all = all.filter((l) => terms.some((t) => l.toLowerCase().includes(t)));
   return all.slice(-lines).join("\n");
 }
 
@@ -215,7 +213,7 @@ export const HA_TOOLS: HaTool<any>[] = [
     name: "ha_get_logs",
     title: "Read logs",
     description:
-      "Read Home Assistant logs. source 'errors' = recent warnings/errors collected by HA (system_log, structured); 'core' = the raw Home Assistant log; 'supervisor' = Supervisor log. Use 'filter' (regex or text) to narrow it down.",
+      "Read Home Assistant logs. source 'errors' = recent warnings/errors collected by HA (system_log, structured); 'core' = the raw Home Assistant log; 'supervisor' = Supervisor log. Use 'filter' (plain text, not a regex; for 'core'/'supervisor' separate alternatives with |, e.g. 'error|warning') to narrow it down.",
     readOnly: true,
     input: {
       source: z.enum(["errors", "core", "supervisor"]).default("errors"),
