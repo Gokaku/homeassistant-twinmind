@@ -1,5 +1,7 @@
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
-import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
+import { Message, MessageAction, MessageActions, MessageContent, MessageResponse } from "@/components/ai-elements/message";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Spinner } from "@/components/ui/spinner";
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
@@ -8,8 +10,19 @@ import { uploadUrl } from "@/lib/api";
 import type { ChatMessage, Part, ProviderId } from "@/lib/protocol";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { AlertTriangleIcon, CheckCircle2Icon, CircleDashedIcon, CircleIcon, FileIcon, InfoIcon, LoaderCircleIcon } from "lucide-react";
-import { memo } from "react";
+import {
+  AlertTriangleIcon,
+  CheckCircle2Icon,
+  CheckIcon,
+  ChevronDownIcon,
+  CircleDashedIcon,
+  CircleIcon,
+  CopyIcon,
+  FileIcon,
+  InfoIcon,
+  ListTodoIcon,
+} from "lucide-react";
+import { memo, useState } from "react";
 import { Logo, PROVIDER_STYLE, ProviderAvatar } from "./brand";
 import { ToolCard } from "./tool-card";
 
@@ -28,7 +41,7 @@ export function Thread({ onSuggestion }: { onSuggestion: (s: string) => void }) 
   if (!current) {
     return loadingId ? (
       <div className="flex flex-1 items-center justify-center text-muted-foreground">
-        <LoaderCircleIcon className="size-5 animate-spin" />
+        <Spinner className="size-5" />
       </div>
     ) : (
       <EmptyState onSuggestion={onSuggestion} />
@@ -112,6 +125,11 @@ const MessageView = memo(function MessageView({ message: m, previous }: { messag
         {m.parts.map((p, i) => (
           <PartView key={p.id} part={p} provider={m.provider} streaming={streaming && i === m.parts.length - 1} />
         ))}
+        {!streaming && m.parts.some((p) => p.type === "text") && (
+          <MessageActions className="-ml-2 opacity-70 hover:opacity-100">
+            <CopyAction text={m.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join("\n\n")} />
+          </MessageActions>
+        )}
       </MessageContent>
     </Message>
   );
@@ -120,7 +138,11 @@ const MessageView = memo(function MessageView({ message: m, previous }: { messag
 function PartView({ part, provider, streaming }: { part: Part; provider: ProviderId; streaming: boolean }) {
   switch (part.type) {
     case "text":
-      return <MessageResponse className="prose-twinmind">{part.text}</MessageResponse>;
+      return (
+        <MessageResponse className="prose-twinmind" isAnimating={streaming}>
+          {part.text}
+        </MessageResponse>
+      );
     case "reasoning":
       return (
         <Reasoning isStreaming={streaming && !part.done} defaultOpen={false}>
@@ -134,7 +156,15 @@ function PartView({ part, provider, streaming }: { part: Part; provider: Provide
       const done = part.items.filter((i) => i.status === "completed").length;
       return (
         <Task defaultOpen className="rounded-xl border bg-card/60 p-3">
-          <TaskTrigger title={`Plan · ${done}/${part.items.length} done`} />
+          <TaskTrigger title="Plan">
+            <button type="button" className="flex w-full items-center gap-2 text-muted-foreground text-sm hover:text-foreground">
+              <ListTodoIcon className="size-4" />
+              <span>
+                Plan · {done}/{part.items.length} done
+              </span>
+              <ChevronDownIcon className="ml-auto size-4 transition-transform group-data-[state=open]:rotate-180" />
+            </button>
+          </TaskTrigger>
           <TaskContent>
             {part.items.map((it, i) => (
               <TaskItem key={i} className="flex items-start gap-2">
@@ -154,19 +184,31 @@ function PartView({ part, provider, streaming }: { part: Part; provider: Provide
     }
     case "notice":
       return (
-        <div
-          className={cn(
-            "flex items-start gap-2 rounded-xl border px-3 py-2.5 text-sm",
-            part.level === "error" ? "border-destructive/40 bg-destructive/10 text-destructive" : "bg-muted/60 text-muted-foreground",
-          )}
-        >
-          {part.level === "error" ? <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" /> : <InfoIcon className="mt-0.5 size-4 shrink-0" />}
-          <span className="min-w-0 break-words">{part.text}</span>
-        </div>
+        <Alert variant={part.level === "error" ? "destructive" : "default"} className={cn("rounded-xl", part.level === "warning" && "border-warn/40 text-warn")}>
+          {part.level === "info" ? <InfoIcon /> : <AlertTriangleIcon />}
+          <AlertDescription className={cn("break-words", part.level === "warning" && "text-warn")}>{part.text}</AlertDescription>
+        </Alert>
       );
     case "file":
       return <FileChip part={part} />;
   }
+}
+
+function CopyAction({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <MessageAction
+      label="Copy answer"
+      onClick={() => {
+        void navigator.clipboard?.writeText(text).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        });
+      }}
+    >
+      {copied ? <CheckIcon className="size-4 text-safe" /> : <CopyIcon className="size-4" />}
+    </MessageAction>
+  );
 }
 
 function thinkingLabel(isStreaming: boolean, duration?: number) {
