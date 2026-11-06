@@ -12,7 +12,8 @@ import { refreshProviders, toast, useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { ExternalLinkIcon, LogOutIcon, ShieldCheckIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { PROVIDER_STYLE } from "./brand";
+import { ModelSelectorLogo } from "@/components/ai-elements/model-selector";
+import { PROVIDER_LOGO } from "./brand";
 import { confirmDialog } from "./dialogs";
 
 export function AccountsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
@@ -35,7 +36,7 @@ export function AccountsSheet({ open, onOpenChange }: { open: boolean; onOpenCha
               <ProviderCard key={p.id} p={p} />
             ))}
           <Alert>
-            <ShieldCheckIcon className="text-safe" />
+            <ShieldCheckIcon />
             <AlertDescription className="text-xs">
               <p>
                 Signed in to Home Assistant as <b className="text-foreground">{user?.name ?? "…"}</b>. Twinmind only opens for Home
@@ -50,7 +51,6 @@ export function AccountsSheet({ open, onOpenChange }: { open: boolean; onOpenCha
 }
 
 function ProviderCard({ p }: { p: ProviderInfo }) {
-  const s = PROVIDER_STYLE[p.id];
   const [busy, setBusy] = useState(false);
   const [code, setCode] = useState("");
   const a = p.auth;
@@ -71,8 +71,8 @@ function ProviderCard({ p }: { p: ProviderInfo }) {
     <Card className="gap-0 py-0">
       <CardHeader className="flex items-center gap-3 py-4">
         <Item variant="default" size="sm" className="flex-1 border-0 p-0">
-          <ItemMedia variant="icon" className={cn("size-10 rounded-xl border-0", s.soft)}>
-            <s.icon className={cn("size-5", s.text)} />
+          <ItemMedia variant="icon">
+            <ModelSelectorLogo provider={PROVIDER_LOGO[p.id]} className="size-4" />
           </ItemMedia>
           <ItemContent className="min-w-0">
             <ItemTitle>{p.label}</ItemTitle>

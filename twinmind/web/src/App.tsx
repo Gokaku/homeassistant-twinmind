@@ -1,6 +1,8 @@
 import { PromptInputProvider } from "@/components/ai-elements/prompt-input";
 import { AccountsSheet } from "@/components/app/accounts-sheet";
-import { Logo } from "@/components/app/brand";
+import { APP_ICON } from "@/components/app/brand";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Composer } from "@/components/app/composer";
 import { DialogHost } from "@/components/app/dialogs";
 import { ConversationList, HistorySheet } from "@/components/app/history-sheet";
@@ -30,9 +32,10 @@ export default function App() {
         <div className="flex min-w-0 flex-1 flex-col">
         <Header onMenu={() => setHistory(true)} onAccounts={() => setAccounts(true)} />
         {connection !== "open" && (
-          <div className="flex items-center justify-center gap-2 bg-muted py-1.5 text-muted-foreground text-xs">
-            <WifiOffIcon className="size-3.5" /> {connection === "connecting" ? "Connecting…" : "Reconnecting…"}
-          </div>
+          <Alert className="rounded-none border-x-0 border-t-0">
+            <WifiOffIcon />
+            <AlertDescription>{connection === "connecting" ? "Connecting…" : "Reconnecting…"}</AlertDescription>
+          </Alert>
         )}
         <main className="flex min-h-0 flex-1 flex-col">
           <Thread onSuggestion={(text) => setSuggestion((s) => ({ text, n: (s?.n ?? 0) + 1 }))} />
@@ -54,7 +57,7 @@ function Sidebar() {
   return (
     <aside className="hidden w-72 shrink-0 flex-col border-r bg-muted/30 lg:flex xl:w-80">
       <div className="flex h-14 items-center gap-2.5 border-b px-4">
-        <Logo className="size-7" />
+        <img src={APP_ICON} alt="" className="size-7" />
         <span className="font-semibold tracking-tight">Twinmind</span>
       </div>
       <ConversationList />
@@ -106,14 +109,14 @@ function Header({ onMenu, onAccounts }: { onMenu: () => void; onAccounts: () => 
 
 function Denied({ reason }: { reason: string | null }) {
   return (
-    <div className="twin-glow flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
-      <span className="flex size-14 items-center justify-center rounded-2xl bg-muted">
-        <LockIcon className="size-6 text-muted-foreground" />
-      </span>
-      <div>
-        <h1 className="font-semibold text-lg">Twinmind is admin-only</h1>
-        <p className="mt-1 max-w-xs text-muted-foreground text-sm">{reason ?? "You need to be a Home Assistant administrator."}</p>
-      </div>
-    </div>
+    <Empty className="h-full">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <LockIcon />
+        </EmptyMedia>
+        <EmptyTitle>Twinmind is admin-only</EmptyTitle>
+        <EmptyDescription>{reason ?? "You need to be a Home Assistant administrator."}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   );
 }

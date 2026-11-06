@@ -32,7 +32,9 @@ import {
   ListTodoIcon,
 } from "lucide-react";
 import { memo, useState } from "react";
-import { Logo, PROVIDER_STYLE, ProviderAvatar } from "./brand";
+import { ModelSelectorLogo } from "@/components/ai-elements/model-selector";
+import { Badge } from "@/components/ui/badge";
+import { APP_ICON, PROVIDER_LOGO, PROVIDER_NAME } from "./brand";
 import { QuestionCard } from "./question-card";
 import { ToolCard } from "./tool-card";
 
@@ -75,24 +77,19 @@ function EmptyState({ onSuggestion }: { onSuggestion: (s: string) => void }) {
   const provider = useStore((s) => s.provider);
   const first = user?.name?.split(" ")[0];
   return (
-    <ConversationEmptyState className="relative flex-1 justify-center overflow-hidden px-6 pt-0 pb-6">
-      <div className="twin-glow pointer-events-none absolute inset-0 opacity-90" />
-      <div className="relative flex flex-col items-center text-center">
-        <Logo className="size-16 drop-shadow-xl" />
-        <h1 className="mt-5 font-semibold text-2xl tracking-tight">{first ? `Hi ${first}` : "Twinmind"}</h1>
-        <p className="mt-1.5 max-w-xs text-balance text-muted-foreground text-sm">
-          Ask <span className={cn("font-medium", PROVIDER_STYLE[provider].text)}>{PROVIDER_STYLE[provider].name}</span> about your
-          home. Switch minds any time; the other one picks up the conversation.
-        </p>
-      </div>
-      <div className="relative mt-8 w-full max-w-xl">
-        <Suggestions className="justify-center px-4 md:w-full md:flex-wrap md:px-0">
-          {SUGGESTIONS.map((s) => (
-            <Suggestion key={s} suggestion={s} onClick={onSuggestion} className="bg-background/70 backdrop-blur" />
-          ))}
-        </Suggestions>
-      </div>
-    </ConversationEmptyState>
+    <div className="flex flex-1 flex-col">
+      <ConversationEmptyState
+        className="flex-1"
+        icon={<img src={APP_ICON} alt="" className="size-12" />}
+        title={first ? `Hi ${first}` : "Twinmind"}
+        description={`Ask ${PROVIDER_NAME[provider]} about your home. Switch assistants any time; the other one picks up the conversation.`}
+      />
+      <Suggestions className="px-4 pb-4">
+        {SUGGESTIONS.map((s) => (
+          <Suggestion key={s} suggestion={s} onClick={onSuggestion} />
+        ))}
+      </Suggestions>
+    </div>
   );
 }
 
@@ -111,7 +108,7 @@ const MessageView = memo(function MessageView({ message: m, previous }: { messag
             </div>
           )}
           {texts.length > 0 && (
-            <MessageContent className="rounded-2xl rounded-br-md bg-primary! px-4 py-2.5 text-primary-foreground! shadow-sm">
+            <MessageContent>
               {texts.map((t) => (t.type === "text" ? <p key={t.id} className="whitespace-pre-wrap break-words">{t.text}</p> : null))}
             </MessageContent>
           )}
@@ -120,17 +117,18 @@ const MessageView = memo(function MessageView({ message: m, previous }: { messag
     );
   }
   const streaming = m.status === "streaming";
-  const style = PROVIDER_STYLE[m.provider];
   const empty = m.parts.length === 0;
   return (
     <Message from="assistant" className="max-w-full">
       <div className="flex items-center gap-2">
-        <ProviderAvatar provider={m.provider} pulse={streaming} />
-        <span className={cn("font-semibold text-sm", style.text)}>{style.name}</span>
-        {m.model && <span className="text-muted-foreground text-xs">{m.model}</span>}
-        {m.status === "interrupted" && <span className="text-muted-foreground text-xs">· stopped</span>}
+        <Badge variant="secondary">
+          <ModelSelectorLogo provider={PROVIDER_LOGO[m.provider]} />
+          {PROVIDER_NAME[m.provider]}
+          {m.model ? ` · ${m.model}` : ""}
+        </Badge>
+        {m.status === "interrupted" && <Badge variant="outline">stopped</Badge>}
       </div>
-      <MessageContent className="w-full gap-3 pl-8">
+      <MessageContent className="w-full">
         {empty && streaming && <Shimmer className="text-sm">Thinking…</Shimmer>}
         {m.parts.map((p, i) => (
           <PartView key={p.id} part={p} provider={m.provider} streaming={streaming && i === m.parts.length - 1} />
@@ -156,7 +154,7 @@ function PartView({ part, provider, streaming }: { part: Part; provider: Provide
     case "reasoning":
       return (
         <Reasoning isStreaming={streaming && !part.done} defaultOpen={false}>
-          <ReasoningTrigger getThinkingMessage={thinkingLabel} />
+          <ReasoningTrigger />
           <ReasoningContent>{part.text}</ReasoningContent>
         </Reasoning>
       );
@@ -196,9 +194,9 @@ function PartView({ part, provider, streaming }: { part: Part; provider: Provide
     }
     case "notice":
       return (
-        <Alert variant={part.level === "error" ? "destructive" : "default"} className={cn("rounded-xl", part.level === "warning" && "border-warn/40 text-warn")}>
+        <Alert variant={part.level === "error" ? "destructive" : "default"}>
           {part.level === "info" ? <InfoIcon /> : <AlertTriangleIcon />}
-          <AlertDescription className={cn("break-words", part.level === "warning" && "text-warn")}>{part.text}</AlertDescription>
+          <AlertDescription className="break-words">{part.text}</AlertDescription>
         </Alert>
       );
     case "file":
@@ -218,16 +216,11 @@ function CopyAction({ text }: { text: string }) {
         });
       }}
     >
-      {copied ? <CheckIcon className="size-4 text-safe" /> : <CopyIcon className="size-4" />}
+      {copied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
     </MessageAction>
   );
 }
 
-function thinkingLabel(isStreaming: boolean, duration?: number) {
-  if (isStreaming || duration === 0) return <Shimmer duration={1}>Thinking…</Shimmer>;
-  if (!duration) return <p>Thought for a moment</p>;
-  return <p>Thought for {duration === 1 ? "1 second" : `${duration} seconds`}</p>;
-}
 
 function FileChip({ part }: { part: Extract<Part, { type: "file" }> }) {
   const url = uploadUrl(part.uploadId);
@@ -245,15 +238,12 @@ function FileChip({ part }: { part: Extract<Part, { type: "file" }> }) {
 }
 
 function Handoff({ to }: { to: ProviderId }) {
-  const st = PROVIDER_STYLE[to];
   return (
-    <Checkpoint className="gap-2 text-xs">
+    <Checkpoint>
       <CheckpointIcon>
-        <ArrowLeftRightIcon className="size-3.5 shrink-0" />
+        <ArrowLeftRightIcon className="size-4 shrink-0" />
       </CheckpointIcon>
-      <span className="shrink-0">
-        Handed over to <span className={cn("font-medium", st.text)}>{st.name}</span>
-      </span>
+      <span className="shrink-0 text-xs">Handed over to {PROVIDER_NAME[to]}</span>
     </Checkpoint>
   );
 }

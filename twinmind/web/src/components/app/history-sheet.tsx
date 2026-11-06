@@ -10,7 +10,8 @@ import { deleteConversation, openConversation, renameConversation, toast, useSto
 import { cn } from "@/lib/utils";
 import { DownloadIcon, MessagesSquareIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
-import { Logo, PROVIDER_STYLE, ProviderAvatar } from "./brand";
+import { ModelSelectorLogo, ModelSelectorLogoGroup } from "@/components/ai-elements/model-selector";
+import { APP_ICON, PROVIDER_LOGO, PROVIDER_NAME } from "./brand";
 import { confirmDialog, promptDialog } from "./dialogs";
 
 function group(ts: number): string {
@@ -83,7 +84,7 @@ export function HistorySheet({ open, onOpenChange }: { open: boolean; onOpenChan
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="left" className="w-[86vw] max-w-sm gap-0 p-0 pt-safe">
         <SheetHeader className="flex-row items-center gap-2.5 border-b px-4 py-3">
-          <Logo className="size-7" />
+          <img src={APP_ICON} alt="" className="size-7" />
           <div>
             <SheetTitle className="text-base">Twinmind</SheetTitle>
             <SheetDescription className="text-xs">Your conversations</SheetDescription>
@@ -96,15 +97,17 @@ export function HistorySheet({ open, onOpenChange }: { open: boolean; onOpenChan
 }
 
 function ConversationRow({ c, active, onPick }: { c: ConversationMeta; active: boolean; onPick: () => void }) {
-  const providers = (Object.keys(c.native) as ProviderId[]).filter((p) => p in PROVIDER_STYLE);
+  const providers = (Object.keys(c.native) as ProviderId[]).filter((p) => p in PROVIDER_LOGO);
   if (!providers.length) providers.push(c.provider);
   return (
     <Item size="sm" className={cn("group gap-1 rounded-xl py-0 pr-1 pl-0", active ? "bg-accent" : "hover:bg-accent/60")}>
       <button type="button" onClick={onPick} className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left">
-        <ItemMedia className="-space-x-2">
-          {providers.map((p) => (
-            <ProviderAvatar key={p} provider={p} className="size-5 ring-2 ring-background" pulse={c.running && p === c.provider} />
-          ))}
+        <ItemMedia>
+          <ModelSelectorLogoGroup>
+            {providers.map((p) => (
+              <ModelSelectorLogo key={p} provider={PROVIDER_LOGO[p]} className="size-4" />
+            ))}
+          </ModelSelectorLogoGroup>
         </ItemMedia>
         <ItemContent className="min-w-0 gap-0">
           <ItemTitle className="block w-full truncate font-normal">{c.title}</ItemTitle>
@@ -200,7 +203,7 @@ function ImportSection({ onImported }: { onImported: (id: string) => void }) {
       {open && (
         <div className="px-1">
           {!sessions && <Spinner className="mx-auto my-4 size-4 text-muted-foreground" />}
-          {sessions?.length === 0 && <p className="px-3 py-3 text-muted-foreground text-xs">No other {PROVIDER_STYLE[open].name} sessions in /config.</p>}
+          {sessions?.length === 0 && <p className="px-3 py-3 text-muted-foreground text-xs">No other {PROVIDER_NAME[open]} sessions in /config.</p>}
           {sessions?.map((s) => (
             <button
               key={s.id}
