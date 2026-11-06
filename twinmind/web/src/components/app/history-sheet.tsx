@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -6,7 +7,7 @@ import { api } from "@/lib/api";
 import type { ConversationMeta, ProviderId } from "@/lib/protocol";
 import { deleteConversation, openConversation, renameConversation, toast, useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { DownloadIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { DownloadIcon, MessagesSquareIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import { Logo, PROVIDER_STYLE, ProviderAvatar } from "./brand";
 import { confirmDialog, promptDialog } from "./dialogs";
@@ -51,7 +52,17 @@ export function ConversationList({ onPicked }: { onPicked?: () => void }) {
         </Button>
       </div>
       <div className="flex-1 overflow-y-auto px-2 pt-2 pb-safe">
-        {conversations.length === 0 && <p className="px-3 py-8 text-center text-muted-foreground text-sm">No conversations yet.</p>}
+        {conversations.length === 0 && (
+          <Empty className="py-8">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <MessagesSquareIcon />
+              </EmptyMedia>
+              <EmptyTitle>No conversations yet</EmptyTitle>
+              <EmptyDescription>Start a chat; it will show up here.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        )}
         {groups.map(([g, items]) => (
           <section key={g} className="mb-2">
             <h3 className="px-3 pt-3 pb-1 font-medium text-[11px] text-muted-foreground uppercase tracking-wide">{g}</h3>

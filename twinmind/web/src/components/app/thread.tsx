@@ -1,4 +1,6 @@
-import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
+import { Attachment, AttachmentInfo, AttachmentPreview, Attachments } from "@/components/ai-elements/attachments";
+import { Checkpoint, CheckpointIcon } from "@/components/ai-elements/checkpoint";
+import { Conversation, ConversationContent, ConversationEmptyState, ConversationScrollButton } from "@/components/ai-elements/conversation";
 import { Message, MessageAction, MessageActions, MessageContent, MessageResponse } from "@/components/ai-elements/message";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
@@ -12,13 +14,13 @@ import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangleIcon,
+  ArrowLeftRightIcon,
   CheckCircle2Icon,
   CheckIcon,
   ChevronDownIcon,
   CircleDashedIcon,
   CircleIcon,
   CopyIcon,
-  FileIcon,
   InfoIcon,
   ListTodoIcon,
 } from "lucide-react";
@@ -65,7 +67,7 @@ function EmptyState({ onSuggestion }: { onSuggestion: (s: string) => void }) {
   const provider = useStore((s) => s.provider);
   const first = user?.name?.split(" ")[0];
   return (
-    <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-6 pb-6">
+    <ConversationEmptyState className="relative flex-1 justify-center overflow-hidden px-6 pt-0 pb-6">
       <div className="twin-glow pointer-events-none absolute inset-0 opacity-90" />
       <div className="relative flex flex-col items-center text-center">
         <Logo className="size-16 drop-shadow-xl" />
@@ -82,7 +84,7 @@ function EmptyState({ onSuggestion }: { onSuggestion: (s: string) => void }) {
           ))}
         </Suggestions>
       </div>
-    </div>
+    </ConversationEmptyState>
   );
 }
 
@@ -218,36 +220,30 @@ function thinkingLabel(isStreaming: boolean, duration?: number) {
 }
 
 function FileChip({ part }: { part: Extract<Part, { type: "file" }> }) {
+  const url = uploadUrl(part.uploadId);
   const isImage = part.mediaType.startsWith("image/");
-  if (isImage) {
-    return (
-      <a href={uploadUrl(part.uploadId)} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl ring-1 ring-border">
-        <img src={uploadUrl(part.uploadId)} alt={part.name} className="max-h-48 max-w-56 object-cover" loading="lazy" />
-      </a>
-    );
-  }
   return (
-    <a
-      href={uploadUrl(part.uploadId)}
-      className="flex max-w-64 items-center gap-2 rounded-xl border bg-card px-3 py-2 text-sm"
-      target="_blank"
-      rel="noreferrer"
-    >
-      <FileIcon className="size-4 shrink-0 text-muted-foreground" />
-      <span className="truncate">{part.name}</span>
+    <a href={url} target="_blank" rel="noreferrer" aria-label={`Open ${part.name}`}>
+      <Attachments variant={isImage ? "grid" : "inline"}>
+        <Attachment data={{ id: part.id, type: "file", url, mediaType: part.mediaType, filename: part.name }} className={isImage ? "size-40" : undefined}>
+          <AttachmentPreview />
+          {!isImage && <AttachmentInfo />}
+        </Attachment>
+      </Attachments>
     </a>
   );
 }
 
 function Handoff({ to }: { to: ProviderId }) {
-  const s = PROVIDER_STYLE[to];
+  const st = PROVIDER_STYLE[to];
   return (
-    <div className="flex items-center gap-3 text-muted-foreground text-xs">
-      <span className="h-px flex-1 bg-border" />
-      <span className="flex items-center gap-1.5">
-        Handed over to <span className={cn("font-medium", s.text)}>{s.name}</span>
+    <Checkpoint className="gap-2 text-xs">
+      <CheckpointIcon>
+        <ArrowLeftRightIcon className="size-3.5 shrink-0" />
+      </CheckpointIcon>
+      <span className="shrink-0">
+        Handed over to <span className={cn("font-medium", st.text)}>{st.name}</span>
       </span>
-      <span className="h-px flex-1 bg-border" />
-    </div>
+    </Checkpoint>
   );
 }
