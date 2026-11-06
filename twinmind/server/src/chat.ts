@@ -89,6 +89,10 @@ export class ChatService implements ToolGate {
     signal?: AbortSignal,
   ): Promise<GateDecision> {
     if (turn.controller.signal.aborted) return { ok: false, reason: "The user stopped this reply." };
+    // The session was looked up when the request arrived. Decide only for the turn that is
+    // still running: a request that outlived its turn must not run with that turn's mode
+    // (or put an approval card on a reply that has already ended).
+    if (this.running.get(cid) !== turn) return { ok: false, reason: "This reply has already ended." };
     const policy = haPolicy(turn.provider, turn.mode);
     if (policy === "allow") return { ok: true };
     if (policy === "read-only")

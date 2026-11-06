@@ -100,4 +100,34 @@ describe("Home Assistant approval gate", () => {
     // Raw tools: asked every time (2 + 2). Specific tool: asked once, then remembered.
     expect(answer.asked()).toBe(5);
   });
+
+  it("refuses a change from a turn that has already ended", async () => {
+    let stale: ReturnType<ChatService["session"]> = null;
+    const cid = await turn("auto", async (ctx) => {
+      stale = chat.session(tokenOf(ctx));
+    });
+    expect(stale).not.toBeNull();
+    expect(chat.isRunning(cid)).toBe(false);
+    const d = await stale!.decide(tool("ha_call_service"), {}, "light.turn_on");
+    expect(d.ok).toBe(false);
+  });
+
+  it("does not decide a request from an earlier turn with that turn's mode", async () => {
+    // Turn 1 runs in "auto" (changes allowed); the request is decided only during turn 2 ("ask").
+    let stale: ReturnType<ChatService["session"]> = null;
+    const cid = await turn("auto", async (ctx) => {
+      stale = chat.session(tokenOf(ctx));
+    });
+    const answer = autoAnswer("deny");
+    let result: boolean | undefined;
+    await turn(
+      "ask",
+      async () => {
+        result = (await stale!.decide(tool("ha_call_service"), {}, "light.turn_on")).ok;
+      },
+      cid,
+    );
+    answer.stop();
+    expect(result).toBe(false);
+  });
 });
