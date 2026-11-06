@@ -25,7 +25,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Cross-Origin-Opener-Policy": "same-origin",
   // Ingress shows the app in an iframe on the same origin as Home Assistant.
   "Content-Security-Policy":
-    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://models.dev; font-src 'self' data:; connect-src 'self' ws: wss: blob: data:; media-src 'self' blob:; frame-ancestors 'self'; base-uri 'self'; form-action 'none'",
+    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss: blob: data:; media-src 'self' blob:; frame-ancestors 'self'; base-uri 'self'; form-action 'none'",
 };
 
 export function createApp(deps: AppDeps) {

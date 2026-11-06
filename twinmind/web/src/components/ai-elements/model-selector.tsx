@@ -183,7 +183,9 @@ export const ModelSelectorLogo = ({
     alt={`${provider} logo`}
     className={cn("size-3 dark:invert", className)}
     height={12}
-    src={`https://models.dev/logos/${provider}.svg`}
+    // Twinmind: logos are bundled (public/logos) instead of loaded from models.dev, so the
+    // CSP needs no third-party image host.
+    src={`./logos/${provider}.svg`}
     width={12}
   />
 );

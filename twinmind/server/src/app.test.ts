@@ -71,6 +71,12 @@ describe("HTTP gate", () => {
     expect(r.status).toBe(200);
     expect((await r.json()).user.id).toBe("admin");
   });
+  it("allows images only from the app itself (no third-party host to leak data to)", async () => {
+    const csp = (await fetch(`${base}/api/me`, { headers: admin })).headers.get("content-security-policy") ?? "";
+    const img = csp.split(";").map((d) => d.trim()).find((d) => d.startsWith("img-src "));
+    expect(img).toBe("img-src 'self' data: blob:");
+    expect(csp).toContain("script-src 'self' 'wasm-unsafe-eval';");
+  });
   it("requires the CSRF header on mutations", async () => {
     const r = await fetch(`${base}/api/conversations/x`, { method: "DELETE", headers: admin });
     expect(r.status).toBe(403);

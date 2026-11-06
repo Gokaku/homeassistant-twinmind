@@ -1,6 +1,6 @@
 import type { ProviderId } from "@/lib/protocol";
 
-/** models.dev logo slug per assistant, for the AI Elements ModelSelectorLogo. */
+/** Logo per assistant (public/logos/<slug>.svg, copied from models.dev), for the AI Elements ModelSelectorLogo. */
 export const PROVIDER_LOGO: Record<ProviderId, string> = { claude: "anthropic", codex: "openai", mock: "vercel" };
 
 export const PROVIDER_NAME: Record<ProviderId, string> = { claude: "Claude", codex: "Codex", mock: "Mock" };
