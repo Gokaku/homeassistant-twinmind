@@ -107,6 +107,13 @@ function killGroup(proc: ChildProcess) {
 }
 
 /** "Always" means for this conversation only: never write rules to settings files. */
+/**
+ * Thinking with readable summaries. Without an explicit display, Claude Code asks the API for
+ * thinking without its text (verified with claude 2.1.318), so the UI's "Thinking" block stayed
+ * empty. Models without adaptive thinking get Claude Code's fixed budget instead.
+ */
+export const THINKING = { type: "adaptive", display: "summarized" } as const;
+
 export function sessionOnly(suggestions: PermissionUpdate[] | undefined): PermissionUpdate[] | undefined {
   return suggestions?.map((s) => ({ ...s, destination: "session" as const }));
 }
@@ -363,6 +370,7 @@ export class ClaudeProvider implements Provider {
         resume: ctx.nativeId,
         model: ctx.model || undefined,
         permissionMode: mode,
+        thinking: THINKING,
         allowDangerouslySkipPermissions: mode === "bypassPermissions",
         includePartialMessages: true,
         canUseTool,
