@@ -142,20 +142,41 @@ export function connect() {
     // A send that was not confirmed yet will never be: give the text back to the user.
     settleInflight(new Error("Connection lost before the message was confirmed. Please send it again."));
     // Find out whether we were refused (not an admin) or just disconnected.
+    // Only Twinmind's own 403 is final. A 401 usually means Home Assistant's ingress
+    // session expired (the HA frontend renews it), a 503 that HA is unreachable: retry.
     if (ev.code === 4403 || state.connection !== "open") {
       try {
         await api("me");
       } catch (e: any) {
-        if (e?.status === 401 || e?.status === 403 || e?.status === 503) {
+        if (e?.status === 403) {
           set({ connection: "denied", deniedReason: e.message });
-          if (e.status !== 503) return;
+          return;
         }
       }
     }
-    if (state.connection !== "denied") set({ connection: "reconnecting" });
-    const delay = Math.min(15_000, 500 * 2 ** retry++);
-    setTimeout(connect, delay);
+    set({ connection: "reconnecting" });
+    scheduleReconnect();
   };
+}
+
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleReconnect(delay = Math.min(15_000, 500 * 2 ** retry++)) {
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connect();
+  }, delay);
+}
+
+// Phones suspend background tabs: reconnect right away when the app comes back.
+if (typeof window !== "undefined") {
+  const wake = () => {
+    if (ws || state.connection === "denied") return;
+    retry = 0;
+    scheduleReconnect(0);
+  };
+  window.addEventListener("online", wake);
+  document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && wake());
 }
 
 function send(msg: ClientMessage): boolean {
