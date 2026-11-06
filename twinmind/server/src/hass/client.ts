@@ -98,8 +98,19 @@ export class HassClient {
   }
 
   private async http(base: string, method: string, path: string, body?: unknown, accept = "application/json"): Promise<any> {
-    if (!path.startsWith("/") || path.includes("..")) throw new HassError("Invalid API path");
-    const res = await fetch(base + path, {
+    // Check the URL as fetch will see it: "%2e%2e" segments are normalized to "..".
+    const url = new URL(base + path);
+    const root = new URL(base.endsWith("/") ? base : `${base}/`);
+    let decoded = path;
+    try {
+      decoded = decodeURIComponent(path);
+    } catch {
+      throw new HassError("Invalid API path");
+    }
+    if (!path.startsWith("/") || decoded.includes("..") || url.origin !== root.origin || !url.pathname.startsWith(root.pathname)) {
+      throw new HassError("Invalid API path");
+    }
+    const res = await fetch(url, {
       method,
       headers: {
         Authorization: `Bearer ${this.opts.token}`,

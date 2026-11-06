@@ -38,8 +38,10 @@ describe("HassClient", () => {
     expect(logs).toContain("ERROR line 0");
   });
 
-  it("refuses path traversal", async () => {
+  it("refuses path traversal, also when encoded", async () => {
     await expect(client.rest("GET", "/../supervisor/info")).rejects.toThrow(/Invalid/);
+    await expect(client.rest("GET", "/%2e%2e/%2e%2e/supervisor/info")).rejects.toThrow(/Invalid/);
+    await expect(client.rest("GET", "/%2E%2E/supervisor/info")).rejects.toThrow(/Invalid/);
   });
 
   it("fails cleanly with a wrong token", async () => {
