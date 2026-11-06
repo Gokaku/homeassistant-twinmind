@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { buildPrompt } from "./handoff.js";
 import type { GateDecision, McpEndpoint, ToolGate } from "./hass/mcp.js";
 import { haPolicy } from "./hass/policy.js";
-import type { HaTool } from "./hass/tools.js";
+import { HA_ALWAYS_ASK, type HaTool } from "./hass/tools.js";
 import type {
   ApprovalDecision,
   ChatMessage,
@@ -117,7 +117,7 @@ export class ChatService implements ToolGate {
     });
     if (signal?.aborted) return { ok: false, reason: "The tool call was cancelled before it was approved." };
     if (decision === "deny") return { ok: false, reason: "The user declined this change." };
-    if (decision === "allow-session") {
+    if (decision === "allow-session" && !HA_ALWAYS_ASK.has(tool.name)) {
       if (!this.sessionAllowed.has(cid)) this.sessionAllowed.set(cid, new Set());
       this.sessionAllowed.get(cid)!.add(tool.name);
     }

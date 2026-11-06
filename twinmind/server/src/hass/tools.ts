@@ -495,3 +495,10 @@ export function formatResult(value: unknown): string {
 }
 
 export const HA_READ_ONLY = new Set(HA_TOOLS.filter((t) => t.readOnly).map((t) => t.name));
+
+/**
+ * The raw escape hatches can do anything the Supervisor token can (create tokens, delete
+ * things, ...). "Always" on one harmless call must not pre-approve every later one, so they
+ * are approved one call at a time.
+ */
+export const HA_ALWAYS_ASK = new Set(["ha_websocket", "ha_rest"]);
