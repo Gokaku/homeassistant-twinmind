@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+Security audit of 0.3.1 and a UI check (details in SECURITY.md).
+
+- Security: Codex sub-agents and goals are turned off; they kept running after a reply
+  ended, with the sandbox of the earlier turn.
+- Security: assistant answers no longer show images (they could make the browser call any
+  Home Assistant address without a click). Provider logos are bundled; the app no longer
+  contacts models.dev.
+- Security: "Always" no longer pre-approves raw Home Assistant WebSocket/REST calls; commands
+  run by Codex no longer see the MCP secret; an HA change is never decided with the mode of
+  a reply that already ended.
+- Stability: the Home Assistant log filter is plain text (a crafted pattern could freeze the
+  server).
+- UI: header fits below the iPhone notch, tool cards fit on narrow phones, attachments
+  show their name and can be removed on touch screens, icon buttons have labels, focus
+  returns after closing the Accounts sheet, "Thought for 1 second".
+
 ## 0.3.1
 
 - The UI is built only from shadcn/ui and AI Elements components, following the AI Elements
