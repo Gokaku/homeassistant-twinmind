@@ -99,3 +99,8 @@ twinmind/
 UI components from [AI Elements](https://github.com/vercel/ai-elements) and
 [shadcn/ui](https://ui.shadcn.com). Claude is a trademark of Anthropic; Codex and ChatGPT are
 trademarks of OpenAI. This project is not affiliated with either.
+
+## License
+
+MIT, see [LICENSE](LICENSE). The copied AI Elements components are Apache-2.0 and the
+shadcn/ui components MIT; their licenses are next to them.
