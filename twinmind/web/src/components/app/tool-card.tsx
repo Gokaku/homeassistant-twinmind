@@ -16,6 +16,7 @@ import {
   ConfirmationTitle,
 } from "@/components/ai-elements/confirmation";
 import { Terminal, TerminalActions, TerminalContent, TerminalCopyButton, TerminalHeader, TerminalTitle } from "@/components/ai-elements/terminal";
+import { Plan, PlanContent, PlanDescription, PlanFooter, PlanHeader, PlanTitle, PlanTrigger } from "@/components/ai-elements/plan";
 import { Tool, ToolContent, getStatusBadge } from "@/components/ai-elements/tool";
 import { MessageResponse } from "@/components/ai-elements/message";
 import { CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -141,7 +142,7 @@ export function ToolCard({ part, provider }: { part: ToolPart; provider: Provide
   useEffect(() => {
     if (awaiting) setOpen(true);
   }, [awaiting]);
-  const decided = part.approval?.decision;
+  if (plan) return <PlanCard part={part} provider={provider} plan={plan} />;
   return (
     <Tool
       open={open}
@@ -170,7 +171,6 @@ export function ToolCard({ part, provider }: { part: ToolPart; provider: Provide
         <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
       </CollapsibleTrigger>
       <ToolContent className="space-y-3 border-t px-3 pt-3 pb-3">
-        {plan && <MessageResponse className="text-sm">{plan}</MessageResponse>}
         {preview && (
           <Code
             code={preview.code}
@@ -194,46 +194,7 @@ export function ToolCard({ part, provider }: { part: ToolPart; provider: Provide
           ))}
         {part.error && <p className="text-destructive text-xs">{part.error}</p>}
       </ToolContent>
-      {part.approval && (
-        <Confirmation
-          approval={decided ? { id: part.approval.id, approved: decided !== "deny" } : { id: part.approval.id }}
-          state={awaiting ? "approval-requested" : "approval-responded"}
-          className={cn("rounded-none border-0 border-t", awaiting ? "bg-warn/5 px-3 py-3" : "px-3 py-1.5")}
-        >
-          <ConfirmationRequest>
-            <div className="flex items-start gap-2">
-              <ShieldAlertIcon className="mt-0.5 size-4 shrink-0 text-warn" />
-              <ConfirmationTitle className="text-foreground text-sm">
-                <span className={cn("font-semibold", PROVIDER_STYLE[provider].text)}>{PROVIDER_STYLE[provider].name}</span> wants to{" "}
-                {part.name === "ExitPlanMode" ? "leave plan mode and carry out this plan" : (VERB[part.kind] ?? "use a tool")}.
-                {part.approval.reason && <span className="mt-1 block text-muted-foreground text-xs">{part.approval.reason}</span>}
-              </ConfirmationTitle>
-            </div>
-          </ConfirmationRequest>
-          <ConfirmationAccepted>
-            <span className="flex items-center gap-1.5 text-muted-foreground text-xs">
-              <CheckIcon className="size-3.5 text-safe" />
-              {decided === "allow-session" ? "Allowed for this conversation" : "Allowed once"}
-            </span>
-          </ConfirmationAccepted>
-          <ConfirmationRejected>
-            <span className="flex items-center gap-1.5 text-muted-foreground text-xs">
-              <XIcon className="size-3.5" /> You denied this
-            </span>
-          </ConfirmationRejected>
-          <ConfirmationActions className="w-full flex-wrap justify-stretch gap-2 sm:justify-end">
-            <ConfirmationAction variant="outline" className="h-10 flex-1 sm:h-8 sm:flex-none" onClick={() => approve(part.approval!.id, "deny")}>
-              Deny
-            </ConfirmationAction>
-            <ConfirmationAction variant="secondary" className="h-10 flex-1 sm:h-8 sm:flex-none" onClick={() => approve(part.approval!.id, "allow-session")}>
-              Always
-            </ConfirmationAction>
-            <ConfirmationAction className="h-10 flex-1 sm:h-8 sm:flex-none" onClick={() => approve(part.approval!.id, "allow")}>
-              Allow
-            </ConfirmationAction>
-          </ConfirmationActions>
-        </Confirmation>
-      )}
+      <ApprovalBlock part={part} provider={provider} />
     </Tool>
   );
 }
@@ -250,4 +211,79 @@ function StatusDot({ state }: { state: ToolPart["state"] }) {
             ? "bg-warn animate-pulse"
             : "bg-codex animate-pulse";
   return <span className={cn("size-2 shrink-0 rounded-full sm:hidden", cls)} aria-label={state} />;
+}
+
+/** Approval request and outcome, shared by tool cards and plan cards. */
+function ApprovalBlock({ part, provider, className }: { part: ToolPart; provider: ProviderId; className?: string }) {
+  if (!part.approval) return null;
+  const awaiting = part.state === "awaiting-approval" && !part.approval.decision;
+  const decided = part.approval.decision;
+  return (
+    <Confirmation
+      approval={decided ? { id: part.approval.id, approved: decided !== "deny" } : { id: part.approval.id }}
+      state={awaiting ? "approval-requested" : "approval-responded"}
+      className={cn("rounded-none border-0 border-t", awaiting ? "bg-warn/5 px-3 py-3" : "px-3 py-1.5")}
+    >
+      <ConfirmationRequest>
+        <div className="flex items-start gap-2">
+          <ShieldAlertIcon className="mt-0.5 size-4 shrink-0 text-warn" />
+          <ConfirmationTitle className="text-foreground text-sm">
+            <span className={cn("font-semibold", PROVIDER_STYLE[provider].text)}>{PROVIDER_STYLE[provider].name}</span> wants to{" "}
+            {part.name === "ExitPlanMode" ? "leave plan mode and carry out this plan" : (VERB[part.kind] ?? "use a tool")}.
+            {part.approval.reason && <span className="mt-1 block text-muted-foreground text-xs">{part.approval.reason}</span>}
+          </ConfirmationTitle>
+        </div>
+      </ConfirmationRequest>
+      <ConfirmationAccepted>
+        <span className="flex items-center gap-1.5 text-muted-foreground text-xs">
+          <CheckIcon className="size-3.5 text-safe" />
+          {decided === "allow-session" ? "Allowed for this conversation" : "Allowed once"}
+        </span>
+      </ConfirmationAccepted>
+      <ConfirmationRejected>
+        <span className="flex items-center gap-1.5 text-muted-foreground text-xs">
+          <XIcon className="size-3.5" /> You denied this
+        </span>
+      </ConfirmationRejected>
+      <ConfirmationActions className="w-full flex-wrap justify-stretch gap-2 sm:justify-end">
+        <ConfirmationAction variant="outline" className="h-10 flex-1 sm:h-8 sm:flex-none" onClick={() => approve(part.approval!.id, "deny")}>
+          Deny
+        </ConfirmationAction>
+        <ConfirmationAction variant="secondary" className="h-10 flex-1 sm:h-8 sm:flex-none" onClick={() => approve(part.approval!.id, "allow-session")}>
+          Always
+        </ConfirmationAction>
+        <ConfirmationAction className="h-10 flex-1 sm:h-8 sm:flex-none" onClick={() => approve(part.approval!.id, "allow")}>
+          Allow
+        </ConfirmationAction>
+      </ConfirmationActions>
+    </Confirmation>
+  );
+}
+
+/** Claude's ExitPlanMode: the plan in an AI Elements Plan card with the approval below. */
+function PlanCard({ part, provider, plan }: { part: ToolPart; provider: ProviderId; plan: string }) {
+  const awaiting = part.state === "awaiting-approval" && !part.approval?.decision;
+  // The first heading becomes the card title (and is not repeated in the body).
+  const heading = plan.match(/^#+\s*(.+)$/m);
+  const title = heading?.[1] ?? "Plan";
+  const body = heading ? plan.replace(heading[0], "").trim() : plan;
+  return (
+    <Plan defaultOpen className={cn(awaiting && "border-warn/60 ring-2 ring-warn/20")}>
+      <PlanHeader>
+        <div>
+          <PlanTitle>{title}</PlanTitle>
+          <PlanDescription>{`${PROVIDER_STYLE[provider].name} ${awaiting ? "proposes this plan" : "proposed this plan"}`}</PlanDescription>
+        </div>
+        <PlanTrigger />
+      </PlanHeader>
+      <PlanContent>
+        <MessageResponse className="text-sm">{body}</MessageResponse>
+      </PlanContent>
+      {part.approval && (
+        <PlanFooter className="block p-0">
+          <ApprovalBlock part={part} provider={provider} />
+        </PlanFooter>
+      )}
+    </Plan>
+  );
 }
