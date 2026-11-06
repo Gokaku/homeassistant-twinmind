@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.1
+
+Fixes from a full code review.
+
+- Security: Codex now applies the selected sandbox on every turn (a chat that once ran in
+  Full access stayed unsandboxed after switching to a stricter mode).
+- Stability: several ways to crash the server are gone (messages over 1 MB, Codex
+  app-server crashes or failed starts, a missing upload file); added a Supervisor watchdog.
+- Sending: messages are no longer lost when the server rejects them or the connection
+  drops, the composer cannot get stuck, the mic button no longer sends the message.
+- Opening a chat while it streams no longer loses text or leaves it stuck "running".
+- Attachments: YAML, JSON, PDF and log files work.
+- Home Assistant tools: history/logbook return the requested window, saving automations or
+  scripts never overwrites another one, an approval is cancelled if the tool call gave up.
+- Codex: finished commands no longer flip back to running, a chat whose first turn failed
+  recovers, multiple approvals per command each get a card.
+- UI: logo visible on phones, Enter adds a new line on phones, command output in a terminal
+  view with colors and copy, copy button on answers, error page instead of a blank screen,
+  expired Home Assistant sessions reconnect instead of showing "admin-only".
+
 ## 0.2.0
 
 - Home Assistant tools for both assistants: search entities, read logs and history,
