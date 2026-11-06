@@ -22,7 +22,9 @@ import {
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
 import { SpeechInput } from "@/components/ai-elements/speech-input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item";
 import type { ModeInfo } from "@/lib/protocol";
 import { currentMode, interrupt, sendMessage, setMode, setModel, toast, useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -82,24 +84,26 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
   if (info && info.auth.state !== "signed-in") {
     return (
       <div className="mx-auto w-full max-w-3xl px-3 pb-safe">
-        <div className="flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-sm">
-          <span className={cn("flex size-9 items-center justify-center rounded-xl", style.soft)}>
-            <style.icon className={cn("size-4", style.text)} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="font-medium text-sm">Sign in to {info.label}</p>
-            <p className="truncate text-muted-foreground text-xs">
+        <Item variant="outline" className="bg-card shadow-sm">
+          <ItemMedia variant="icon" className={cn("border-0", style.soft)}>
+            <style.icon className={style.text} />
+          </ItemMedia>
+          <ItemContent className="min-w-0">
+            <ItemTitle>Sign in to {info.label}</ItemTitle>
+            <ItemDescription className="truncate">
               {info.auth.state === "pending"
                 ? "Sign-in in progress"
                 : info.auth.state === "unavailable"
                   ? info.auth.reason
                   : `Use your ${info.id === "claude" ? "Claude" : "ChatGPT"} subscription`}
-            </p>
-          </div>
-          <Button size="sm" onClick={onOpenAccounts} className="rounded-full">
-            <LogInIcon className="size-4" /> Sign in
-          </Button>
-        </div>
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Button size="sm" onClick={onOpenAccounts}>
+              <LogInIcon /> Sign in
+            </Button>
+          </ItemActions>
+        </Item>
       </div>
     );
   }
@@ -109,12 +113,14 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
   return (
     <div className="mx-auto w-full max-w-3xl px-3 pb-safe">
       {modeInfo?.risk === "danger" && (
-        <div className="mb-1.5 flex items-center gap-1.5 px-2 text-danger text-xs">
-          <ShieldAlertIcon className="size-3.5" />
-          <span>
-            <b>{modeInfo.label}</b>: {modeInfo.description}
-          </span>
-        </div>
+        <Alert variant="destructive" className="mb-2 py-2">
+          <ShieldAlertIcon />
+          <AlertDescription className="text-xs">
+            <p>
+              <b>{modeInfo.label}</b>: {modeInfo.description}
+            </p>
+          </AlertDescription>
+        </Alert>
       )}
       <PromptInput
         onSubmit={onSubmit}
