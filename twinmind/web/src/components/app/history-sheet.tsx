@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -98,19 +99,19 @@ function ConversationRow({ c, active, onPick }: { c: ConversationMeta; active: b
   const providers = (Object.keys(c.native) as ProviderId[]).filter((p) => p in PROVIDER_STYLE);
   if (!providers.length) providers.push(c.provider);
   return (
-    <div className={cn("group flex items-center gap-1 rounded-xl pr-1", active ? "bg-accent" : "hover:bg-accent/60")}>
+    <Item size="sm" className={cn("group gap-1 rounded-xl py-0 pr-1 pl-0", active ? "bg-accent" : "hover:bg-accent/60")}>
       <button type="button" onClick={onPick} className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left">
-        <span className="-space-x-2 flex shrink-0">
+        <ItemMedia className="-space-x-2">
           {providers.map((p) => (
             <ProviderAvatar key={p} provider={p} className="size-5 ring-2 ring-background" pulse={c.running && p === c.provider} />
           ))}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm">{c.title}</span>
-          <span className="block text-muted-foreground text-xs">
+        </ItemMedia>
+        <ItemContent className="min-w-0 gap-0">
+          <ItemTitle className="block w-full truncate font-normal">{c.title}</ItemTitle>
+          <ItemDescription className="text-xs">
             {time(c.updatedAt)} · {c.messageCount} messages
-          </span>
-        </span>
+          </ItemDescription>
+        </ItemContent>
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -143,7 +144,7 @@ function ConversationRow({ c, active, onPick }: { c: ConversationMeta; active: b
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-    </div>
+    </Item>
   );
 }
 

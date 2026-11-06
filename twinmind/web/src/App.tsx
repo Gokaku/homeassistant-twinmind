@@ -8,6 +8,7 @@ import { ProviderSwitch } from "@/components/app/provider-switch";
 import { Thread } from "@/components/app/thread";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { openConversation, useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { CircleUserRoundIcon, LockIcon, MenuIcon, SquarePenIcon, WifiOffIcon } from "lucide-react";
@@ -23,6 +24,7 @@ export default function App() {
   if (connection === "denied") return <Denied reason={denied} />;
 
   return (
+    <TooltipProvider delayDuration={400}>
     <PromptInputProvider>
       <div className="flex h-full">
         <Sidebar />
@@ -44,6 +46,7 @@ export default function App() {
         <Toaster position="top-center" />
       </div>
     </PromptInputProvider>
+    </TooltipProvider>
   );
 }
 
@@ -66,9 +69,14 @@ function Header({ onMenu, onAccounts }: { onMenu: () => void; onAccounts: () => 
   return (
     <header className="pt-safe sticky top-0 z-20 border-b bg-background/80 backdrop-blur-xl">
       <div className="mx-auto grid h-14 max-w-3xl grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1 px-1.5">
-        <Button size="icon" variant="ghost" className="size-10 rounded-full lg:invisible" onClick={onMenu} aria-label="Conversations">
+        <Tooltip>
+          <TooltipTrigger asChild>
+          <Button size="icon" variant="ghost" className="size-10 rounded-full lg:invisible" onClick={onMenu} aria-label="Conversations">
           <MenuIcon className="size-5" />
         </Button>
+          </TooltipTrigger>
+          <TooltipContent>Conversations</TooltipContent>
+        </Tooltip>
         <div className="flex min-w-0 items-center justify-center gap-2 overflow-hidden">
           {title ? (
             <span className="hidden truncate font-medium text-sm md:block">{title}</span>
@@ -79,13 +87,23 @@ function Header({ onMenu, onAccounts }: { onMenu: () => void; onAccounts: () => 
         </div>
         <div className="flex items-center">
           {hasChat && (
-            <Button size="icon" variant="ghost" className="size-10 rounded-full" onClick={() => openConversation(null)} aria-label="New chat">
+            <Tooltip>
+              <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" className="size-10 rounded-full" onClick={() => openConversation(null)} aria-label="New chat">
               <SquarePenIcon className="size-5" />
             </Button>
+              </TooltipTrigger>
+              <TooltipContent>New chat</TooltipContent>
+            </Tooltip>
           )}
-          <Button size="icon" variant="ghost" className="size-10 rounded-full" onClick={onAccounts} aria-label="Accounts">
+          <Tooltip>
+            <TooltipTrigger asChild>
+            <Button size="icon" variant="ghost" className="size-10 rounded-full" onClick={onAccounts} aria-label="Accounts">
             <CircleUserRoundIcon className="size-5" />
           </Button>
+            </TooltipTrigger>
+            <TooltipContent>Accounts</TooltipContent>
+          </Tooltip>
         </div>
       </div>
     </header>
