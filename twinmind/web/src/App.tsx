@@ -1,24 +1,23 @@
 import { PromptInputProvider } from "@/components/ai-elements/prompt-input";
 import { AccountsSheet } from "@/components/app/accounts-sheet";
-import { APP_ICON } from "@/components/app/brand";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Composer } from "@/components/app/composer";
 import { DialogHost } from "@/components/app/dialogs";
-import { ConversationList, HistorySheet } from "@/components/app/history-sheet";
+import { AppSidebar } from "@/components/app/app-sidebar";
 import { Thread } from "@/components/app/thread";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { openConversation, useStore } from "@/lib/store";
-import { cn } from "@/lib/utils";
-import { CircleUserRoundIcon, LockIcon, MenuIcon, SquarePenIcon, WifiOffIcon } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { CircleUserRoundIcon, LockIcon, SquarePenIcon, WifiOffIcon } from "lucide-react";
 import { useState } from "react";
 
 export default function App() {
   const connection = useStore((s) => s.connection);
   const denied = useStore((s) => s.deniedReason);
-  const [history, setHistory] = useState(false);
   const [accounts, setAccounts] = useState(false);
   const [suggestion, setSuggestion] = useState<{ text: string; n: number } | null>(null);
 
@@ -26,83 +25,57 @@ export default function App() {
 
   return (
     <TooltipProvider delayDuration={400}>
-    <PromptInputProvider>
-      <div className="flex h-full">
-        <Sidebar />
-        <div className="flex min-w-0 flex-1 flex-col">
-        <Header onMenu={() => setHistory(true)} onAccounts={() => setAccounts(true)} />
-        {connection !== "open" && (
-          <Alert className="rounded-none border-x-0 border-t-0">
-            <WifiOffIcon />
-            <AlertDescription>{connection === "connecting" ? "Connecting…" : "Reconnecting…"}</AlertDescription>
-          </Alert>
-        )}
-        <main className="flex min-h-0 flex-1 flex-col">
-          <Thread onSuggestion={(text) => setSuggestion((s) => ({ text, n: (s?.n ?? 0) + 1 }))} />
-        </main>
-        <Composer onOpenAccounts={() => setAccounts(true)} suggestion={suggestion} />
-        </div>
-        <HistorySheet open={history} onOpenChange={setHistory} />
-        <AccountsSheet open={accounts} onOpenChange={setAccounts} />
-        <DialogHost />
-        <Toaster position="top-center" />
-      </div>
-    </PromptInputProvider>
+      <PromptInputProvider>
+        <SidebarProvider className="h-full min-h-0">
+          <AppSidebar />
+          <SidebarInset className="min-h-0 min-w-0">
+            <Header onAccounts={() => setAccounts(true)} />
+            {connection !== "open" && (
+              <Alert className="rounded-none border-x-0 border-t-0">
+                <WifiOffIcon />
+                <AlertDescription>{connection === "connecting" ? "Connecting…" : "Reconnecting…"}</AlertDescription>
+              </Alert>
+            )}
+            <div className="flex min-h-0 flex-1 flex-col">
+              <Thread onSuggestion={(text) => setSuggestion((s) => ({ text, n: (s?.n ?? 0) + 1 }))} />
+            </div>
+            <Composer onOpenAccounts={() => setAccounts(true)} suggestion={suggestion} />
+          </SidebarInset>
+          <AccountsSheet open={accounts} onOpenChange={setAccounts} />
+          <DialogHost />
+          <Toaster position="top-center" />
+        </SidebarProvider>
+      </PromptInputProvider>
     </TooltipProvider>
   );
 }
 
-/** Desktop: the conversation list stays visible. */
-function Sidebar() {
-  return (
-    <aside className="hidden w-72 shrink-0 flex-col border-r bg-muted/30 lg:flex xl:w-80">
-      <div className="flex h-14 items-center gap-2.5 border-b px-4">
-        <img src={APP_ICON} alt="" className="size-7" />
-        <span className="font-semibold tracking-tight">Twinmind</span>
-      </div>
-      <ConversationList />
-    </aside>
-  );
-}
-
-function Header({ onMenu, onAccounts }: { onMenu: () => void; onAccounts: () => void }) {
+function Header({ onAccounts }: { onAccounts: () => void }) {
   const title = useStore((s) => (s.currentId ? s.conversations.find((c) => c.id === s.currentId)?.title : null));
   const hasChat = useStore((s) => !!s.currentId);
   return (
-    <header className="pt-safe sticky top-0 z-20 border-b bg-background/80 backdrop-blur-xl">
-      <div className="mx-auto grid h-14 max-w-3xl grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1 px-1.5">
+    <header className="pt-safe flex h-14 shrink-0 items-center gap-2 border-b px-2">
+      <SidebarTrigger />
+      <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />
+      <span className="min-w-0 flex-1 truncate font-medium text-sm">{title ?? "Twinmind"}</span>
+      {hasChat && (
         <Tooltip>
           <TooltipTrigger asChild>
-          <Button size="icon" variant="ghost" className="size-10 rounded-full lg:invisible" onClick={onMenu} aria-label="Conversations">
-          <MenuIcon className="size-5" />
-        </Button>
-          </TooltipTrigger>
-          <TooltipContent>Conversations</TooltipContent>
-        </Tooltip>
-        <div className="flex min-w-0 items-center justify-center gap-2 overflow-hidden">
-          <span className="truncate font-medium text-sm">{title ?? "Twinmind"}</span>
-        </div>
-        <div className="flex items-center">
-          {hasChat && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" className="size-10 rounded-full" onClick={() => openConversation(null)} aria-label="New chat">
-              <SquarePenIcon className="size-5" />
+            <Button size="icon" variant="ghost" onClick={() => openConversation(null)} aria-label="New chat">
+              <SquarePenIcon />
             </Button>
-              </TooltipTrigger>
-              <TooltipContent>New chat</TooltipContent>
-            </Tooltip>
-          )}
-          <Tooltip>
-            <TooltipTrigger asChild>
-            <Button size="icon" variant="ghost" className="size-10 rounded-full" onClick={onAccounts} aria-label="Accounts">
-            <CircleUserRoundIcon className="size-5" />
+          </TooltipTrigger>
+          <TooltipContent>New chat</TooltipContent>
+        </Tooltip>
+      )}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button size="icon" variant="ghost" onClick={onAccounts} aria-label="Accounts">
+            <CircleUserRoundIcon />
           </Button>
-            </TooltipTrigger>
-            <TooltipContent>Accounts</TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
+        </TooltipTrigger>
+        <TooltipContent>Accounts</TooltipContent>
+      </Tooltip>
     </header>
   );
 }
