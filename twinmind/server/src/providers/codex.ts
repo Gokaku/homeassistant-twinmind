@@ -355,7 +355,10 @@ export class CodexProvider implements Provider {
             p.itemId,
             setTimeout(() => {
               turn.flush.delete(p.itemId);
-              emit({ type: "part", part: { ...part } });
+              // Send the card as it is now, never an older copy: the command may have
+              // completed in the meantime.
+              const latest = turn.parts.get(p.itemId);
+              if (latest) emit({ type: "part", part: { ...latest } });
             }, 250),
           );
         }
@@ -364,6 +367,10 @@ export class CodexProvider implements Provider {
       case "item/started":
       case "item/completed": {
         const item = p.item;
+        if (method === "item/completed" && item?.id) {
+          const pending = turn.flush.get(item.id);
+          if (pending) clearTimeout(pending), turn.flush.delete(item.id);
+        }
         if (item?.type === "agentMessage") {
           if (method === "item/completed" && !turn.textItems.has(item.id) && item.text) {
             emit({ type: "part", part: { type: "text", id: item.id, text: item.text } });
