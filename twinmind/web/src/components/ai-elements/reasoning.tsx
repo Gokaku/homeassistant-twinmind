@@ -5,6 +5,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { markdownRehypePlugins } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import { code } from "@streamdown/code";
 import { BrainIcon, ChevronDownIcon } from "lucide-react";
@@ -212,7 +213,10 @@ export const ReasoningContent = memo(
       )}
       {...props}
     >
-      <Streamdown plugins={streamdownPlugins}>{children}</Streamdown>
+      {/* Twinmind: no remote images in assistant Markdown (see lib/markdown.ts). */}
+      <Streamdown plugins={streamdownPlugins} rehypePlugins={markdownRehypePlugins}>
+        {children}
+      </Streamdown>
     </CollapsibleContent>
   )
 );

@@ -10,3 +10,5 @@ Local changes (marked "Twinmind:" in the code):
 - context.tsx: rows show a cost only when one was computed (no "$0.00" without a model price).
 - model-selector.tsx: ModelSelectorLogo loads the logo from `public/logos` (copies of the
   models.dev SVGs for the providers we use) instead of https://models.dev.
+- message.tsx (MessageResponse), reasoning.tsx (ReasoningContent): Streamdown gets
+  `rehypePlugins` from `src/lib/markdown.ts` (the defaults, but no remote images).

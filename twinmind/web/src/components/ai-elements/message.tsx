@@ -10,6 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { markdownRehypePlugins } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import { code } from "@streamdown/code";
 import type { UIMessage } from "ai";
@@ -327,6 +328,8 @@ export const MessageResponse = memo(
         className
       )}
       plugins={streamdownPlugins}
+      // Twinmind: no remote images in assistant Markdown (see lib/markdown.ts).
+      rehypePlugins={markdownRehypePlugins}
       {...props}
     />
   ),
