@@ -41,4 +41,10 @@ describe("threadConfig", () => {
       mcp_servers: { homeassistant: { url: "http://127.0.0.1:1/mcp/token", bearer_token_env_var: "TWINMIND_MCP_SECRET" } },
     });
   });
+
+  it("turns off everything that keeps working after the turn ended", () => {
+    // Verified with codex 0.166: sub-agents and goals both ran on unattended, with the
+    // sandbox of an earlier Full access turn.
+    expect(threadConfig(undefined)).toMatchObject({ features: { multi_agent: false, goals: false } });
+  });
 });

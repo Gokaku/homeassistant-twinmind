@@ -98,6 +98,13 @@ export function threadConfig(mcp: { url: string } | undefined): Record<string, u
     // The app-server needs the MCP secret in its environment (bearer_token_env_var), but the
     // commands Codex runs inherit that environment: keep the secret out of theirs.
     shell_environment_policy: { exclude: [MCP_SECRET_VAR] },
+    // Nothing may keep working after Twinmind's turn has ended, where the user can neither see
+    // nor stop it and no approval card can be shown (verified with codex 0.166):
+    // - sub-agents run on with the sandbox of the turn that spawned them (a Full access
+    //   sub-agent kept writing outside /config during a later Read only turn);
+    // - a goal (create_goal) makes Codex start new turns on its own, in a loop, with the last
+    //   turn's sandbox (Full access: unsandboxed, without approvals).
+    features: { multi_agent: false, goals: false },
     ...(mcp
       ? {
           // Twinmind's Home Assistant tools; the bearer secret is read from the app-server's environment.
