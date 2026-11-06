@@ -26,6 +26,7 @@ export function createFakeHa(token = "good-token") {
       { area_id: "living", name: "Living room" },
     ] as any[],
     automations: { "1700": { id: "1700", alias: "Night mode", triggers: [], actions: [] } } as Record<string, any>,
+    scripts: { morning_routine: { alias: "Morning routine", sequence: [] } } as Record<string, any>,
     serviceCalls: [] as any[],
     requests: [] as string[],
     wsCommands: [] as any[],
@@ -55,11 +56,13 @@ export function createFakeHa(token = "good-token") {
       state.serviceCalls.push({ domain: m[1], service: m[2], data });
       return json(res, 200, url.search.includes("return_response") ? { changed_states: [], service_response: { ok: true } } : []);
     }
-    m = p.match(/^\/core\/api\/config\/automation\/config\/(.+)$/);
+    m = p.match(/^\/core\/api\/config\/(automation|script)\/config\/(.+)$/);
     if (m) {
-      if (req.method === "GET") return state.automations[m[1]] ? json(res, 200, state.automations[m[1]]) : json(res, 404, { message: "Resource not found" });
-      if (req.method === "POST") return (state.automations[m[1]] = data), json(res, 200, { result: "ok" });
-      if (req.method === "DELETE") return delete state.automations[m[1]], json(res, 200, { result: "ok" });
+      const store = m[1] === "automation" ? state.automations : state.scripts;
+      const key = decodeURIComponent(m[2]);
+      if (req.method === "GET") return store[key] ? json(res, 200, store[key]) : json(res, 404, { message: "Resource not found" });
+      if (req.method === "POST") return (store[key] = data), json(res, 200, { result: "ok" });
+      if (req.method === "DELETE") return delete store[key], json(res, 200, { result: "ok" });
     }
     if (p === "/core/api/template" && req.method === "POST") {
       res.writeHead(200, { "Content-Type": "text/plain" });

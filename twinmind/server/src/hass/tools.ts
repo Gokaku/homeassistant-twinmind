@@ -68,6 +68,28 @@ function describeEntities(r: Registries) {
   });
 }
 
+/** A Home Assistant slug (cv.slug): lowercase ASCII letters, digits and single underscores. */
+export function slugify(text: string): string {
+  return text
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 60)
+    .replace(/_+$/g, "");
+}
+
+async function configExists(ha: HassClient, kind: string, id: string): Promise<boolean> {
+  try {
+    await ha.rest("GET", `/config/${kind}/config/${encodeURIComponent(id)}`);
+    return true;
+  } catch (e: any) {
+    if (e?.code === 404) return false;
+    throw e;
+  }
+}
+
 function tail(text: string, lines: number, filter?: string): string {
   let all = String(text ?? "").split("\n");
   if (filter) {
@@ -417,8 +439,16 @@ export const HA_TOOLS: HaTool<any>[] = [
     summary: (a) => `${a.id ? "update" : "create"} ${a.kind ?? "automation"} “${String((a.config as any)?.alias ?? a.id ?? "")}”`,
     async run(ha, a) {
       const kind = a.kind ?? "automation";
-      const id = a.id ?? (kind === "automation" ? String(Date.now()) : String((a.config as any)?.alias ?? "script").toLowerCase().replace(/\W+/g, "_").slice(0, 60) || `script_${Date.now()}`);
-      await ha.rest("POST", `/config/${kind}/config/${encodeURIComponent(id)}`, kind === "automation" ? { id, ...a.config } : a.config);
+      let id = a.id;
+      if (!id) {
+        // New item: never overwrite an existing one with the same key.
+        const base = kind === "automation" ? String(Date.now()) : slugify(String((a.config as any)?.alias ?? "")) || `script_${Date.now()}`;
+        id = base;
+        for (let n = 2; await configExists(ha, kind, id); n++) id = `${base}_${n}`;
+      }
+      // The id in the URL decides what is written; an id copied into the config must not differ.
+      const body = kind === "automation" ? { ...a.config, id } : (({ id: _ignored, ...rest }) => rest)(a.config as Record<string, unknown>);
+      await ha.rest("POST", `/config/${kind}/config/${encodeURIComponent(id)}`, body);
       return { saved: true, kind, id, entity_hint: kind === "script" ? `script.${id}` : "automation.<derived from alias>" };
     },
   }),

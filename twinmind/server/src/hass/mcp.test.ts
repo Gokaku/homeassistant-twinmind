@@ -156,6 +156,20 @@ describe("Home Assistant MCP endpoint", () => {
     await c.close();
   });
 
+  it("never overwrites an existing script when creating one, and keeps the URL id authoritative", async () => {
+    const c = await connect();
+    nextDecision = { ok: true };
+    const r = JSON.parse(text(await c.callTool({ name: "ha_save_automation", arguments: { kind: "script", config: { alias: "Morning routine!", sequence: [1] } } })));
+    expect(r.id).toBe("morning_routine_2");
+    expect(ha.state.scripts.morning_routine.sequence).toEqual([]);
+    const odd = JSON.parse(text(await c.callTool({ name: "ha_save_automation", arguments: { kind: "script", config: { alias: "🌙 Nacht-Modus", sequence: [] } } })));
+    expect(odd.id).toBe("nacht_modus");
+    await c.callTool({ name: "ha_save_automation", arguments: { id: "1700", config: { id: "999", alias: "Night mode v2" } } });
+    expect(ha.state.automations["1700"].id).toBe("1700");
+    expect(ha.state.automations["999"]).toBeUndefined();
+    await c.close();
+  });
+
   it("rejects invalid service names", async () => {
     const c = await connect();
     const r: any = await c.callTool({ name: "ha_call_service", arguments: { domain: "light/../x", service: "on" } });
