@@ -12,7 +12,7 @@ import type { ProviderInfo } from "@/lib/protocol";
 import { refreshProviders, toast, useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { ExternalLinkIcon, LogOutIcon, ShieldCheckIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ModelSelectorLogo } from "@/components/ai-elements/model-selector";
 import { PROVIDER_LOGO } from "./brand";
 import { confirmDialog } from "./dialogs";
@@ -20,12 +20,26 @@ import { confirmDialog } from "./dialogs";
 export function AccountsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const providers = useStore((s) => s.providers);
   const user = useStore((s) => s.user);
+  // Opened from several places without a SheetTrigger, so Radix has nothing to return
+  // focus to on close: remember what had focus and go back there.
+  const opener = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (open) void refreshProviders();
   }, [open]);
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-[92vw] max-w-md gap-0 p-0 pt-safe">
+      <SheetContent
+        side="right"
+        className="w-[92vw] max-w-md gap-0 p-0 pt-safe"
+        onOpenAutoFocus={() => {
+          opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        }}
+        onCloseAutoFocus={(e) => {
+          if (!opener.current?.isConnected) return;
+          e.preventDefault();
+          opener.current.focus();
+        }}
+      >
         <SheetHeader className="border-b px-4 py-3">
           <SheetTitle className="text-base">Accounts</SheetTitle>
           <SheetDescription className="text-xs">Sign in with your own subscriptions. Tokens stay inside this add-on.</SheetDescription>
