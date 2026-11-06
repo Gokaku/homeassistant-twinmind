@@ -1,4 +1,15 @@
-import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -46,6 +57,31 @@ export function DialogHost() {
     current = null;
     emit();
   };
+
+  // Confirmation: shadcn AlertDialog.
+  if (ask && !ask.input) {
+    return (
+      <AlertDialog open onOpenChange={(o) => !o && close(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{ask.title}</AlertDialogTitle>
+            {ask.description && <AlertDialogDescription>{ask.description}</AlertDialogDescription>}
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => close(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(ask.destructive && buttonVariants({ variant: "destructive" }))}
+              onClick={() => close(true)}
+            >
+              {ask.confirmLabel ?? "OK"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  }
+
+  // Text input: shadcn Dialog with a form.
   return (
     <Dialog open={!!ask} onOpenChange={(o) => !o && close(null)}>
       <DialogContent className="max-w-[calc(100vw-2rem)] rounded-2xl sm:max-w-md">
@@ -56,20 +92,16 @@ export function DialogHost() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            close(ask?.input ? value.trim() || null : true);
+            close(value.trim() || null);
           }}
           className="space-y-4"
         >
-          {ask?.input && (
-            <Input autoFocus value={value} placeholder={ask.input.placeholder} onChange={(e) => setValue(e.target.value)} className="rounded-xl" />
-          )}
-          <DialogFooter className="flex-row justify-end gap-2">
+          <Input autoFocus value={value} placeholder={ask?.input?.placeholder} onChange={(e) => setValue(e.target.value)} />
+          <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => close(null)}>
               Cancel
             </Button>
-            <Button type="submit" variant={ask?.destructive ? "destructive" : "default"}>
-              {ask?.confirmLabel ?? "OK"}
-            </Button>
+            <Button type="submit">{ask?.confirmLabel ?? "OK"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
