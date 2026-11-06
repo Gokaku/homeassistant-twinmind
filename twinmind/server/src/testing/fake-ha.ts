@@ -27,6 +27,7 @@ export function createFakeHa(token = "good-token") {
     ] as any[],
     automations: { "1700": { id: "1700", alias: "Night mode", triggers: [], actions: [] } } as Record<string, any>,
     serviceCalls: [] as any[],
+    requests: [] as string[],
     wsCommands: [] as any[],
   };
 
@@ -41,6 +42,7 @@ export function createFakeHa(token = "good-token") {
     for await (const c of req) body += c;
     const data = body ? JSON.parse(body) : undefined;
     const url = new URL(req.url!, "http://x");
+    state.requests.push(req.url!);
     const p = url.pathname;
     if (p === "/core/api/states") return json(res, 200, state.states);
     let m = p.match(/^\/core\/api\/states\/(.+)$/);

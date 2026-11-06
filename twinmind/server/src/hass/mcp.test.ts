@@ -141,6 +141,21 @@ describe("Home Assistant MCP endpoint", () => {
     expect(ha.state.serviceCalls.length).toBe(before);
   });
 
+  it("asks Home Assistant for history and logbook up to now", async () => {
+    const c = await connect();
+    await c.callTool({ name: "ha_history", arguments: { entity_ids: ["light.kitchen"], hours: 72 } });
+    await c.callTool({ name: "ha_logbook", arguments: { hours: 48, entity_id: "light.kitchen" } });
+    const hist = ha.state.requests.find((u) => u.includes("/history/period/"))!;
+    const book = ha.state.requests.find((u) => u.includes("/logbook/"))!;
+    for (const u of [hist, book]) {
+      const end = new URL(u, "http://x").searchParams.get("end_time");
+      expect(end).toBeTruthy();
+      expect(Math.abs(Date.parse(end!) - Date.now())).toBeLessThan(60_000);
+    }
+    expect(new URL(book, "http://x").searchParams.get("entity")).toBe("light.kitchen");
+    await c.close();
+  });
+
   it("rejects invalid service names", async () => {
     const c = await connect();
     const r: any = await c.callTool({ name: "ha_call_service", arguments: { domain: "light/../x", service: "on" } });

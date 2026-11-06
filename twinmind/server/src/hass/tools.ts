@@ -239,7 +239,13 @@ export const HA_TOOLS: HaTool<any>[] = [
     summary: (a) => `${a.entity_ids.join(", ")} · ${a.hours ?? 24} h`,
     async run(ha, a) {
       const start = new Date(Date.now() - (a.hours ?? 24) * 3600_000).toISOString();
-      const q = new URLSearchParams({ filter_entity_id: a.entity_ids.join(","), minimal_response: "", no_attributes: "" });
+      // end_time is required: without it HA ends the window one day after the start.
+      const q = new URLSearchParams({
+        filter_entity_id: a.entity_ids.join(","),
+        end_time: new Date().toISOString(),
+        minimal_response: "",
+        no_attributes: "",
+      });
       const data: any[][] = await ha.rest("GET", `/history/period/${encodeURIComponent(start)}?${q}`);
       return data.map((series) => ({
         entity_id: series[0]?.entity_id,
@@ -256,8 +262,10 @@ export const HA_TOOLS: HaTool<any>[] = [
     summary: (a) => `${a.entity_id ?? "all"} · ${a.hours ?? 6} h`,
     async run(ha, a) {
       const start = new Date(Date.now() - (a.hours ?? 6) * 3600_000).toISOString();
-      const q = a.entity_id ? `?entity=${encodeURIComponent(a.entity_id)}` : "";
-      const data: any[] = await ha.rest("GET", `/logbook/${encodeURIComponent(start)}${q}`);
+      // end_time is required: without it HA ends the window one day after the start.
+      const q = new URLSearchParams({ end_time: new Date().toISOString() });
+      if (a.entity_id) q.set("entity", a.entity_id);
+      const data: any[] = await ha.rest("GET", `/logbook/${encodeURIComponent(start)}?${q}`);
       return data.slice(-(a.limit ?? 200));
     },
   }),
