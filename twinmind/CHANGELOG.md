@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.4
+
+- Cleaner add-on log: no repeated Claude SDK warning on every reply, no bashio deprecation
+  warning at start.
+
 ## 0.3.3
 
 - Claude's thinking is shown again (the Thinking block was empty).
