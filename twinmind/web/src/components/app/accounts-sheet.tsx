@@ -1,5 +1,6 @@
 import { Snippet, SnippetCopyButton, SnippetInput } from "@/components/ai-elements/snippet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item";
@@ -169,7 +170,7 @@ function hostOf(url: string): string {
 function Step({ n, children }: { n: number; children: React.ReactNode }) {
   return (
     <p className="flex items-center gap-2 text-sm">
-      <span className="flex size-5 items-center justify-center rounded-full bg-foreground font-semibold text-[11px] text-background">{n}</span>
+      <Badge variant="secondary">{n}</Badge>
       {children}
     </p>
   );
