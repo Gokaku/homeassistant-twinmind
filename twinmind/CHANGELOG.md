@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0
+
+- Assistants can ask you questions (single or multiple choice, or free text) and continue
+  with your answers. Claude's question tool is enabled again.
+- Plans from Claude's plan mode are shown in a plan card that you approve or deny.
+- Todo lists are shown as a task queue with progress.
+- A context meter shows how full the model's context window is.
+- The UI now uses shadcn/ui and AI Elements components throughout (toasts, confirmation
+  dialogs, assistant switch, cards, empty states, tooltips, terminal output).
+
 ## 0.2.1
 
 Fixes from a full code review.

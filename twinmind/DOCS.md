@@ -77,6 +77,14 @@ they run without asking only in **Bypass** / **Full access**, are refused in **P
 **Read only** and **Don't ask**, and show an approval card in every other mode. Twinmind
 enforces this itself, so it applies to Claude and Codex alike.
 
+## Questions, plans and context
+
+- When an assistant needs a decision, it asks in the chat with options to tap (or your own
+  answer). *Skip* dismisses the question.
+- In **Plan** mode Claude explores first and then shows its plan in a card; *Allow* lets it
+  start working, *Deny* keeps it planning.
+- The ring next to the mode picker shows how full the assistant's context window is.
+
 ## Tips
 
 - Attach photos, YAML files or log excerpts with the paperclip.
