@@ -26,15 +26,6 @@
   --input: oklch(0.9 0.01 270);
   --ring: oklch(0.65 0.12 275);
 
-  /* The two minds. */
-  --claude: oklch(0.68 0.15 42);
-  --claude-soft: oklch(0.68 0.15 42 / 0.12);
-  --codex: oklch(0.62 0.17 268);
-  --codex-soft: oklch(0.62 0.17 268 / 0.12);
-  --mock: oklch(0.65 0.12 160);
-  --danger: oklch(0.62 0.22 25);
-  --warn: oklch(0.75 0.15 75);
-  --safe: oklch(0.68 0.13 160);
 
   --app-height: 100dvh;
 }
@@ -58,10 +49,6 @@
   --border: oklch(0.28 0.016 275);
   --input: oklch(0.3 0.018 275);
   --ring: oklch(0.6 0.12 275);
-  --claude: oklch(0.74 0.14 45);
-  --claude-soft: oklch(0.74 0.14 45 / 0.14);
-  --codex: oklch(0.7 0.15 268);
-  --codex-soft: oklch(0.7 0.15 268 / 0.16);
 }
 
 @theme inline {
@@ -87,14 +74,6 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-claude: var(--claude);
-  --color-claude-soft: var(--claude-soft);
-  --color-codex: var(--codex);
-  --color-codex-soft: var(--codex-soft);
-  --color-mock: var(--mock);
-  --color-danger: var(--danger);
-  --color-warn: var(--warn);
-  --color-safe: var(--safe);
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 }
@@ -134,13 +113,6 @@
 }
 .pb-safe {
   padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
-}
-
-/* Soft glow behind the empty state. */
-.twin-glow {
-  background:
-    radial-gradient(40% 60% at 35% 40%, var(--claude-soft), transparent 70%),
-    radial-gradient(40% 60% at 65% 60%, var(--codex-soft), transparent 70%);
 }
 
 .scrollbar-none {

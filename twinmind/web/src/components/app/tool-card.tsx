@@ -17,8 +17,8 @@ import { approve } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import type { ToolUIPart } from "ai";
 import { useEffect, useState } from "react";
-import { CheckIcon, ShieldAlertIcon, XIcon } from "lucide-react";
-import { PROVIDER_STYLE } from "./brand";
+import { CheckIcon, XIcon } from "lucide-react";
+import { PROVIDER_NAME } from "./brand";
 
 const VERB: Record<ToolKind, string> = {
   command: "run a command",
@@ -96,38 +96,32 @@ function ApprovalBlock({ part, provider, className }: { part: ToolPart; provider
     <Confirmation
       approval={decided ? { id: part.approval.id, approved: decided !== "deny" } : { id: part.approval.id }}
       state={awaiting ? "approval-requested" : "approval-responded"}
-      className={cn("rounded-none border-0 border-t", awaiting ? "bg-warn/5 px-3 py-3" : "px-3 py-1.5")}
+      className={className}
     >
-      <ConfirmationRequest>
-        <div className="flex items-start gap-2">
-          <ShieldAlertIcon className="mt-0.5 size-4 shrink-0 text-warn" />
-          <ConfirmationTitle className="text-foreground text-sm">
-            <span className={cn("font-semibold", PROVIDER_STYLE[provider].text)}>{PROVIDER_STYLE[provider].name}</span> wants to{" "}
-            {part.name === "ExitPlanMode" ? "leave plan mode and carry out this plan" : (VERB[part.kind] ?? "use a tool")}.
-            {part.approval.reason && <span className="mt-1 block text-muted-foreground text-xs">{part.approval.reason}</span>}
-          </ConfirmationTitle>
-        </div>
-      </ConfirmationRequest>
-      <ConfirmationAccepted>
-        <span className="flex items-center gap-1.5 text-muted-foreground text-xs">
-          <CheckIcon className="size-3.5 text-safe" />
-          {decided === "allow-session" ? "Allowed for this conversation" : "Allowed once"}
-        </span>
-      </ConfirmationAccepted>
-      <ConfirmationRejected>
-        <span className="flex items-center gap-1.5 text-muted-foreground text-xs">
-          <XIcon className="size-3.5" /> You denied this
-        </span>
-      </ConfirmationRejected>
-      <ConfirmationActions className="w-full flex-wrap justify-stretch gap-2 sm:justify-end">
-        <ConfirmationAction variant="outline" className="h-10 flex-1 sm:h-8 sm:flex-none" onClick={() => approve(part.approval!.id, "deny")}>
-          Deny
+      <ConfirmationTitle>
+        <ConfirmationRequest>
+          {PROVIDER_NAME[provider]} wants to{" "}
+          {part.name === "ExitPlanMode" ? "leave plan mode and carry out this plan" : (VERB[part.kind] ?? "use a tool")}
+          {part.approval.reason ? ` (${part.approval.reason})` : ""}. Do you approve?
+        </ConfirmationRequest>
+        <ConfirmationAccepted>
+          <CheckIcon className="size-4 text-green-600 dark:text-green-400" />
+          <span>{decided === "allow-session" ? "You allowed this for the rest of the conversation" : "You approved this"}</span>
+        </ConfirmationAccepted>
+        <ConfirmationRejected>
+          <XIcon className="size-4 text-destructive" />
+          <span>You rejected this</span>
+        </ConfirmationRejected>
+      </ConfirmationTitle>
+      <ConfirmationActions>
+        <ConfirmationAction onClick={() => approve(part.approval!.id, "deny")} variant="outline">
+          Reject
         </ConfirmationAction>
-        <ConfirmationAction variant="secondary" className="h-10 flex-1 sm:h-8 sm:flex-none" onClick={() => approve(part.approval!.id, "allow-session")}>
+        <ConfirmationAction onClick={() => approve(part.approval!.id, "allow-session")} variant="secondary">
           Always
         </ConfirmationAction>
-        <ConfirmationAction className="h-10 flex-1 sm:h-8 sm:flex-none" onClick={() => approve(part.approval!.id, "allow")}>
-          Allow
+        <ConfirmationAction onClick={() => approve(part.approval!.id, "allow")} variant="default">
+          Approve
         </ConfirmationAction>
       </ConfirmationActions>
     </Confirmation>
@@ -142,11 +136,11 @@ function PlanCard({ part, provider, plan }: { part: ToolPart; provider: Provider
   const title = heading?.[1] ?? "Plan";
   const body = heading ? plan.replace(heading[0], "").trim() : plan;
   return (
-    <Plan defaultOpen className={cn(awaiting && "border-warn/60 ring-2 ring-warn/20")}>
+    <Plan defaultOpen>
       <PlanHeader>
         <div>
           <PlanTitle>{title}</PlanTitle>
-          <PlanDescription>{`${PROVIDER_STYLE[provider].name} ${awaiting ? "proposes this plan" : "proposed this plan"}`}</PlanDescription>
+          <PlanDescription>{`${PROVIDER_NAME[provider]} ${awaiting ? "proposes this plan" : "proposed this plan"}`}</PlanDescription>
         </div>
         <PlanTrigger />
       </PlanHeader>
