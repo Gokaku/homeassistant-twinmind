@@ -1,11 +1,21 @@
-import { CodeBlock } from "@/components/ai-elements/code-block";
+import {
+  CodeBlock,
+  CodeBlockActions,
+  CodeBlockCopyButton,
+  CodeBlockFilename,
+  CodeBlockHeader,
+  CodeBlockTitle,
+} from "@/components/ai-elements/code-block";
 import {
   Confirmation,
+  ConfirmationAccepted,
   ConfirmationAction,
   ConfirmationActions,
+  ConfirmationRejected,
   ConfirmationRequest,
   ConfirmationTitle,
 } from "@/components/ai-elements/confirmation";
+import { Terminal, TerminalActions, TerminalContent, TerminalCopyButton, TerminalHeader, TerminalTitle } from "@/components/ai-elements/terminal";
 import { Tool, ToolContent, getStatusBadge } from "@/components/ai-elements/tool";
 import { MessageResponse } from "@/components/ai-elements/message";
 import { CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -13,6 +23,7 @@ import type { ProviderId, ToolKind, ToolPart } from "@/lib/protocol";
 import { approve } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import type { ToolUIPart } from "ai";
+import { useEffect, useState } from "react";
 import {
   BotIcon,
   CheckIcon,
@@ -67,7 +78,8 @@ export function uiState(p: ToolPart): ToolUIPart["state"] {
     case "denied":
       return "output-denied";
     default:
-      return "input-available";
+      // Approved and now running.
+      return p.approval?.decision ? "approval-responded" : "input-available";
   }
 }
 
@@ -102,6 +114,21 @@ function displayName(p: ToolPart): string {
   return p.name.replace(/^mcp__([^_]+)__/, "$1 · ");
 }
 
+function Code({ code, language, label }: { code: string; language: string; label: string }) {
+  return (
+    <CodeBlock code={code} language={language as any} className="text-xs [&_pre]:max-h-72">
+      <CodeBlockHeader className="py-1.5">
+        <CodeBlockTitle>
+          <CodeBlockFilename className="font-sans">{label}</CodeBlockFilename>
+        </CodeBlockTitle>
+        <CodeBlockActions>
+          <CodeBlockCopyButton className="size-7" />
+        </CodeBlockActions>
+      </CodeBlockHeader>
+    </CodeBlock>
+  );
+}
+
 export function ToolCard({ part, provider }: { part: ToolPart; provider: ProviderId }) {
   const Icon = KIND_ICON[part.kind] ?? WrenchIcon;
   const state = uiState(part);
@@ -109,10 +136,16 @@ export function ToolCard({ part, provider }: { part: ToolPart; provider: Provide
   const preview = inputPreview(part);
   const isDiff = part.kind === "file" && part.output?.includes("@@");
   const plan = part.name === "ExitPlanMode" && typeof (part.input as any)?.plan === "string" ? ((part.input as any).plan as string) : null;
+  // Always controlled: opens by itself when an approval is needed, otherwise the user decides.
+  const [open, setOpen] = useState(awaiting);
+  useEffect(() => {
+    if (awaiting) setOpen(true);
+  }, [awaiting]);
+  const decided = part.approval?.decision;
   return (
     <Tool
-      defaultOpen={awaiting}
-      open={awaiting ? true : undefined}
+      open={open}
+      onOpenChange={setOpen}
       className={cn(
         "mb-0 overflow-hidden rounded-xl bg-card/60 shadow-xs",
         awaiting && "border-warn/60 ring-2 ring-warn/20",
@@ -139,44 +172,33 @@ export function ToolCard({ part, provider }: { part: ToolPart; provider: Provide
       <ToolContent className="space-y-3 border-t px-3 pt-3 pb-3">
         {plan && <MessageResponse className="text-sm">{plan}</MessageResponse>}
         {preview && (
-          <div className="overflow-hidden rounded-lg text-xs [&_pre]:max-h-72">
-            <CodeBlock code={preview.code} language={preview.language as any} />
-          </div>
+          <Code
+            code={preview.code}
+            language={preview.language}
+            label={part.kind === "command" ? "Command" : preview.language === "diff" ? "Change" : "Input"}
+          />
         )}
-        {part.output && (
-          <div className="space-y-1">
-            <div className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
-              {part.state === "error" ? "Error" : "Output"}
-            </div>
-            {isDiff ? (
-              <div className="overflow-hidden rounded-lg text-xs [&_pre]:max-h-72">
-                <CodeBlock code={part.output} language="diff" />
-              </div>
-            ) : (
-              <pre
-                className={cn(
-                  "max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-muted/60 p-3 font-mono text-xs",
-                  part.state === "error" && "bg-destructive/10 text-destructive",
-                )}
-              >
-                {part.output}
-              </pre>
-            )}
-          </div>
-        )}
+        {part.output &&
+          (isDiff ? (
+            <Code code={part.output} language="diff" label="Diff" />
+          ) : (
+            <Terminal output={part.output} isStreaming={part.state === "running"} className={cn("text-xs", part.state === "error" && "border-destructive/50")}>
+              <TerminalHeader className="py-1.5">
+                <TerminalTitle>{part.state === "error" ? "Error" : "Output"}</TerminalTitle>
+                <TerminalActions>
+                  <TerminalCopyButton className="size-7" />
+                </TerminalActions>
+              </TerminalHeader>
+              <TerminalContent className="max-h-72 p-3 text-xs" />
+            </Terminal>
+          ))}
         {part.error && <p className="text-destructive text-xs">{part.error}</p>}
       </ToolContent>
-      {part.approval?.decision && (
-        <div className="flex items-center gap-1.5 border-t px-3 py-1.5 text-muted-foreground text-xs">
-          {part.approval.decision === "deny" ? <XIcon className="size-3.5" /> : <CheckIcon className="size-3.5 text-safe" />}
-          {part.approval.decision === "deny" ? "You denied this" : part.approval.decision === "allow-session" ? "Allowed for this session" : "Allowed once"}
-        </div>
-      )}
-      {awaiting && part.approval && (
+      {part.approval && (
         <Confirmation
-          approval={{ id: part.approval.id }}
-          state="approval-requested"
-          className="rounded-none border-0 border-t bg-warn/5 px-3 py-3"
+          approval={decided ? { id: part.approval.id, approved: decided !== "deny" } : { id: part.approval.id }}
+          state={awaiting ? "approval-requested" : "approval-responded"}
+          className={cn("rounded-none border-0 border-t", awaiting ? "bg-warn/5 px-3 py-3" : "px-3 py-1.5")}
         >
           <ConfirmationRequest>
             <div className="flex items-start gap-2">
@@ -188,6 +210,17 @@ export function ToolCard({ part, provider }: { part: ToolPart; provider: Provide
               </ConfirmationTitle>
             </div>
           </ConfirmationRequest>
+          <ConfirmationAccepted>
+            <span className="flex items-center gap-1.5 text-muted-foreground text-xs">
+              <CheckIcon className="size-3.5 text-safe" />
+              {decided === "allow-session" ? "Allowed for this conversation" : "Allowed once"}
+            </span>
+          </ConfirmationAccepted>
+          <ConfirmationRejected>
+            <span className="flex items-center gap-1.5 text-muted-foreground text-xs">
+              <XIcon className="size-3.5" /> You denied this
+            </span>
+          </ConfirmationRejected>
           <ConfirmationActions className="w-full flex-wrap justify-stretch gap-2 sm:justify-end">
             <ConfirmationAction variant="outline" className="h-10 flex-1 sm:h-8 sm:flex-none" onClick={() => approve(part.approval!.id, "deny")}>
               Deny
