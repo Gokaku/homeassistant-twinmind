@@ -282,7 +282,7 @@ export const ContextInputUsage = ({
       {...props}
     >
       <span className="text-muted-foreground">Input</span>
-      <TokensWithCost costText={inputCostText} tokens={inputTokens} />
+      <TokensWithCost costText={inputCost === undefined ? undefined : inputCostText} /* Twinmind: no "$0.00" without a price */ tokens={inputTokens} />
     </div>
   );
 };
@@ -322,7 +322,7 @@ export const ContextOutputUsage = ({
       {...props}
     >
       <span className="text-muted-foreground">Output</span>
-      <TokensWithCost costText={outputCostText} tokens={outputTokens} />
+      <TokensWithCost costText={outputCost === undefined ? undefined : outputCostText} /* Twinmind: no "$0.00" without a price */ tokens={outputTokens} />
     </div>
   );
 };
@@ -362,7 +362,7 @@ export const ContextReasoningUsage = ({
       {...props}
     >
       <span className="text-muted-foreground">Reasoning</span>
-      <TokensWithCost costText={reasoningCostText} tokens={reasoningTokens} />
+      <TokensWithCost costText={reasoningCost === undefined ? undefined : reasoningCostText} /* Twinmind: no "$0.00" without a price */ tokens={reasoningTokens} />
     </div>
   );
 };
@@ -402,7 +402,7 @@ export const ContextCacheUsage = ({
       {...props}
     >
       <span className="text-muted-foreground">Cache</span>
-      <TokensWithCost costText={cacheCostText} tokens={cacheTokens} />
+      <TokensWithCost costText={cacheCost === undefined ? undefined : cacheCostText} /* Twinmind: no "$0.00" without a price */ tokens={cacheTokens} />
     </div>
   );
 };

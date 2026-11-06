@@ -236,6 +236,9 @@ function handle(e: ServerEvent) {
         return upsertPart(m, created);
       });
       break;
+    case "usage":
+      patchMessage(e.conversationId, e.messageId, (m) => ({ ...m, usage: e.usage }));
+      break;
     case "turn.end":
       patchMessage(e.conversationId, e.messageId, (m) => ({
         ...m,

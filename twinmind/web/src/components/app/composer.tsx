@@ -21,6 +21,17 @@ import {
   usePromptInputController,
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
+import {
+  Context,
+  ContextCacheUsage,
+  ContextContent,
+  ContextContentBody,
+  ContextContentHeader,
+  ContextInputUsage,
+  ContextOutputUsage,
+  ContextReasoningUsage,
+  ContextTrigger,
+} from "@/components/ai-elements/context";
 import { SpeechInput } from "@/components/ai-elements/speech-input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -57,6 +68,13 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
     return !!c?.messages.some((m) => m.status === "streaming");
   });
   const connected = useStore((s) => s.connection === "open");
+  // Context usage of the latest reply that reported it, in the open chat.
+  const usage = useStore((s) => {
+    const c = s.currentId ? s.details[s.currentId] : null;
+    if (!c) return undefined;
+    for (let i = c.messages.length - 1; i >= 0; i--) if (c.messages[i].usage) return c.messages[i].usage;
+    return undefined;
+  });
   const controller = usePromptInputController();
   const runningRef = useRef(running);
   runningRef.current = running;
@@ -183,6 +201,40 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
                 </PromptInputSelectContent>
               </PromptInputSelect>
             )}
+            {usage?.contextWindow ? (
+              <Context
+                maxTokens={usage.contextWindow}
+                usedTokens={usage.contextTokens}
+                usage={{
+                  inputTokens: usage.inputTokens,
+                  outputTokens: usage.outputTokens,
+                  totalTokens: usage.contextTokens,
+                  inputTokenDetails: {
+                    noCacheTokens: usage.inputTokens - (usage.cachedInputTokens ?? 0),
+                    cacheReadTokens: usage.cachedInputTokens ?? 0,
+                    cacheWriteTokens: undefined,
+                  },
+                  outputTokenDetails: {
+                    textTokens: usage.outputTokens - (usage.reasoningTokens ?? 0),
+                    reasoningTokens: usage.reasoningTokens ?? 0,
+                  },
+                  // Read by the Context rows (deprecated aliases in ai v6).
+                  reasoningTokens: usage.reasoningTokens ?? 0,
+                  cachedInputTokens: usage.cachedInputTokens ?? 0,
+                }}
+              >
+                <ContextTrigger size="sm" className="h-8 rounded-full px-2 text-xs" />
+                <ContextContent>
+                  <ContextContentHeader />
+                  <ContextContentBody>
+                    <ContextInputUsage />
+                    <ContextOutputUsage />
+                    <ContextReasoningUsage />
+                    <ContextCacheUsage />
+                  </ContextContentBody>
+                </ContextContent>
+              </Context>
+            ) : null}
             {info && info.models.length > 1 && <ModelSelect models={info.models} value={model} onChange={(v) => setModel(providerId, v)} />}
           </PromptInputTools>
           <PromptInputSubmit
