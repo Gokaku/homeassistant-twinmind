@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { toast as sonner } from "sonner";
 import { api, uploadFile, wsUrl } from "./api";
 import { loadPref, savePref } from "./prefs";
 import type {
@@ -28,7 +29,6 @@ export interface State {
   models: Partial<Record<ProviderId, string>>;
   /** A send is in flight and no conversation event has confirmed it yet. */
   pending: string | null;
-  toast: { id: number; text: string; level: "error" | "info" } | null;
 }
 
 let state: State = {
@@ -43,7 +43,6 @@ let state: State = {
   modes: loadPref("modes", {}),
   models: loadPref("models", {}),
   pending: null,
-  toast: null,
 };
 
 const listeners = new Set<() => void>();
@@ -58,11 +57,10 @@ export function useStore<T>(selector: (s: State) => T): T {
   return useSyncExternalStore(subscribe, () => selector(state));
 }
 
-let toastId = 0;
+/** Show a toast (shadcn's sonner). */
 export function toast(text: string, level: "error" | "info" = "error") {
-  const id = ++toastId;
-  set({ toast: { id, text, level } });
-  setTimeout(() => state.toast?.id === id && set({ toast: null }), 5000);
+  if (level === "error") sonner.error(text);
+  else sonner.info(text);
 }
 
 /* ---------- immutable helpers ---------- */

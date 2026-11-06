@@ -7,6 +7,7 @@ import { ConversationList, HistorySheet } from "@/components/app/history-sheet";
 import { ProviderSwitch } from "@/components/app/provider-switch";
 import { Thread } from "@/components/app/thread";
 import { Button } from "@/components/ui/button";
+import { Toaster } from "@/components/ui/sonner";
 import { openConversation, useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { CircleUserRoundIcon, LockIcon, MenuIcon, SquarePenIcon, WifiOffIcon } from "lucide-react";
@@ -40,7 +41,7 @@ export default function App() {
         <HistorySheet open={history} onOpenChange={setHistory} />
         <AccountsSheet open={accounts} onOpenChange={setAccounts} />
         <DialogHost />
-        <Toast />
+        <Toaster position="top-center" />
       </div>
     </PromptInputProvider>
   );
@@ -88,30 +89,6 @@ function Header({ onMenu, onAccounts }: { onMenu: () => void; onAccounts: () => 
         </div>
       </div>
     </header>
-  );
-}
-
-function Toast() {
-  const t = useStore((s) => s.toast);
-  // The live region stays mounted so screen readers announce the text when it changes.
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+4rem)] z-50 flex justify-center px-4"
-    >
-      {t && (
-        <div
-          key={t.id}
-          className={cn(
-            "fade-in slide-in-from-top-2 pointer-events-auto max-w-md animate-in rounded-2xl border px-4 py-2.5 text-sm shadow-lg backdrop-blur-xl",
-            t.level === "error" ? "border-destructive/30 bg-background/95 text-destructive" : "bg-background/95",
-          )}
-        >
-          {t.text}
-        </div>
-      )}
-    </div>
   );
 }
 
