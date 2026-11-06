@@ -283,12 +283,16 @@ export class ClaudeProvider implements Provider {
         title: toolTitle(toolName, input),
         input,
         reason: options.decisionReason || (options as any).description,
+        // Claude can withdraw the question (e.g. the turn moved on): close the card then.
+        signal: options.signal,
       });
       if (decision === "deny") return { behavior: "deny", message: "The user declined this action.", toolUseID: id };
+      // When Claude says a standing rule would grant more than this action, "Always" means once.
+      const remember = decision === "allow-session" && !options.suppressAlwaysAllowRule;
       return {
         behavior: "allow",
         updatedInput: input,
-        updatedPermissions: decision === "allow-session" ? sessionOnly(options.suggestions) : undefined,
+        updatedPermissions: remember ? sessionOnly(options.suggestions) : undefined,
         toolUseID: id,
       };
     };

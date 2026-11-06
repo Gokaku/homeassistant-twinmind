@@ -439,7 +439,9 @@ export class CodexProvider implements Provider {
       return this.declineUnknown(req);
     }
     const ask = async (kind: "command" | "file", title: string, input: unknown, reason?: string) => {
-      const toolPartId = p.itemId ?? p.callId ?? randomUUID();
+      // One command can raise several approvals (approvalId); each needs its own card.
+      const base = p.itemId ?? p.callId ?? randomUUID();
+      const toolPartId = p.approvalId ? `${base}:${p.approvalId}` : base;
       const existing = turn.parts.get(toolPartId);
       const decision = await turn.ctx.requestApproval({
         toolPartId,
