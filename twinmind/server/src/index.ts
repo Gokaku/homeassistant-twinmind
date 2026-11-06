@@ -11,6 +11,10 @@ import type { Provider } from "./providers/types.js";
 import { ConversationStore } from "./store.js";
 import { UploadStore } from "./uploads.js";
 
+// Log stray promise rejections instead of exiting (Node's default), so one bad event cannot
+// kill every running chat. Real crashes still exit; the Supervisor watchdog restarts us.
+process.on("unhandledRejection", (e) => console.error("[twinmind] unhandled rejection:", e));
+
 const config = loadConfig();
 
 const listUsers = config.supervisorToken ? coreUserLister(config.coreWebsocketUrl, config.supervisorToken) : null;

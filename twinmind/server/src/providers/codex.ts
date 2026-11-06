@@ -96,7 +96,9 @@ export class CodexProvider implements Provider {
     // Codex reads the MCP bearer secret from its environment; nothing else secret is passed.
     const rpc = new CodexRpc(bin, () => agentEnv({ TWINMIND_MCP_SECRET: process.env.TWINMIND_MCP_SECRET }));
     rpc.on("notification", (method: string, params: any) => this.onNotification(method, params));
-    rpc.on("request", (req: ServerRequestMsg) => void this.onRequest(req));
+    rpc.on("request", (req: ServerRequestMsg) =>
+      this.onRequest(req).catch((e) => console.warn(`[twinmind] Codex request ${req.method} failed: ${e?.message ?? e}`)),
+    );
     rpc.on("exit", (err: Error) => {
       for (const t of this.turns.values()) t.reject(err);
       this.turns.clear();

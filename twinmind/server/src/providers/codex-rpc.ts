@@ -57,28 +57,41 @@ export class CodexRpc extends EventEmitter {
     this.ready = (async () => {
       const proc = spawn(this.bin, ["app-server"], { env: this.env(), stdio: ["pipe", "pipe", "pipe"] });
       this.proc = proc;
-      proc.stderr.on("data", (d) => {
-        this.stderrTail = (this.stderrTail + d.toString()).slice(-4000);
-        if (process.env.TWINMIND_DEBUG) process.stderr.write(`[codex] ${d}`);
-      });
-      proc.on("exit", (code) => {
-        const err = new Error(`Codex app-server exited (${code}). ${this.stderrTail.trim().split("\n").pop() ?? ""}`);
+      // Everything below only touches shared state if this is still the current process,
+      // so an old process exiting late cannot break a newer one.
+      const current = () => this.proc === proc;
+      const fail = (err: Error) => {
+        if (!current()) return;
         for (const p of this.pending.values()) clearTimeout(p.timer), p.reject(err);
         this.pending.clear();
         this.proc = null;
         this.ready = null;
         this.emit("exit", err);
+      };
+      proc.stderr.on("data", (d) => {
+        this.stderrTail = (this.stderrTail + d.toString()).slice(-4000);
+        if (process.env.TWINMIND_DEBUG) process.stderr.write(`[codex] ${d}`);
       });
-      proc.on("error", (e) => this.emit("error", e));
+      proc.on("exit", (code) => fail(new Error(`Codex app-server exited (${code}). ${this.stderrTail.trim().split("\n").pop() ?? ""}`)));
+      // Spawn failures (EACCES, ENOMEM, ...) and broken pipes must not crash the server.
+      proc.on("error", (e) => fail(new Error(`Codex app-server failed: ${e.message}`)));
+      proc.stdin.on("error", (e) => fail(new Error(`Codex app-server pipe closed: ${e.message}`)));
       const rl = readline.createInterface({ input: proc.stdout });
-      rl.on("line", (line) => this.onLine(line));
-      await this.request("initialize", {
-        clientInfo: { name: "twinmind", title: "Twinmind", version: "0.1.0" },
-        capabilities: { experimentalApi: false, requestAttestation: false },
-      });
-      this.notify("initialized");
+      rl.on("line", (line) => current() && this.onLine(line));
+      try {
+        await this.request("initialize", {
+          clientInfo: { name: "twinmind", title: "Twinmind", version: "0.1.0" },
+          capabilities: { experimentalApi: false, requestAttestation: false },
+        });
+        this.notify("initialized");
+      } catch (e) {
+        // Do not leave a half-started process behind.
+        proc.kill();
+        fail(e instanceof Error ? e : new Error(String(e)));
+        throw e;
+      }
     })();
-    this.ready.catch(() => (this.ready = null));
+    this.ready.catch(() => {});
     return this.ready;
   }
 
@@ -136,12 +149,13 @@ export class CodexRpc extends EventEmitter {
     this.write(params === undefined ? { jsonrpc: "2.0", method } : { jsonrpc: "2.0", method, params });
   }
 
+  /** Answer a server request. A no-op if the app-server is gone (nobody to answer). */
   respond(id: number | string, result: unknown) {
-    this.write({ jsonrpc: "2.0", id, result });
+    if (this.proc) this.write({ jsonrpc: "2.0", id, result });
   }
 
   respondError(id: number | string, message: string) {
-    this.write({ jsonrpc: "2.0", id, error: { code: -32601, message } });
+    if (this.proc) this.write({ jsonrpc: "2.0", id, error: { code: -32601, message } });
   }
 
   async stop(): Promise<void> {
