@@ -155,7 +155,7 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
         <PromptInputFooter>
           <PromptInputTools className="min-w-0 flex-wrap">
             <PromptInputActionMenu>
-              <PromptInputActionMenuTrigger />
+              <PromptInputActionMenuTrigger aria-label="Add attachments" />
               <PromptInputActionMenuContent>
                 <PromptInputActionAddAttachments />
               </PromptInputActionMenuContent>

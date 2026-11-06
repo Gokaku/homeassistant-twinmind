@@ -67,7 +67,7 @@ export function Thread({ onSuggestion }: { onSuggestion: (s: string) => void }) 
           <MessageView key={m.id} message={m} previous={current.messages[i - 1]} />
         ))}
       </ConversationContent>
-      <ConversationScrollButton className="bottom-3 shadow-md" />
+      <ConversationScrollButton aria-label="Scroll to latest message" className="bottom-3 shadow-md" />
     </Conversation>
   );
 }

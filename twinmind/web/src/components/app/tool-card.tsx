@@ -8,7 +8,15 @@ import {
   ConfirmationRequest,
   ConfirmationTitle,
 } from "@/components/ai-elements/confirmation";
-import { Terminal } from "@/components/ai-elements/terminal";
+import {
+  Terminal,
+  TerminalActions,
+  TerminalContent,
+  TerminalCopyButton,
+  TerminalHeader,
+  TerminalStatus,
+  TerminalTitle,
+} from "@/components/ai-elements/terminal";
 import { Plan, PlanContent, PlanDescription, PlanFooter, PlanHeader, PlanTitle, PlanTrigger } from "@/components/ai-elements/plan";
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from "@/components/ai-elements/tool";
 import { MessageResponse } from "@/components/ai-elements/message";
@@ -70,7 +78,19 @@ export function ToolCard({ part, provider }: { part: ToolPart; provider: Provide
   const output = !part.output ? undefined : isDiff ? (
     <CodeBlock code={part.output} language="diff" />
   ) : part.kind === "command" ? (
-    <Terminal output={part.output} isStreaming={part.state === "running"} />
+    // Composed like the upstream example so the icon-only copy button gets a name.
+    <Terminal output={part.output} isStreaming={part.state === "running"}>
+      <TerminalHeader>
+        <TerminalTitle />
+        <div className="flex items-center gap-1">
+          <TerminalStatus />
+          <TerminalActions>
+            <TerminalCopyButton aria-label="Copy output" />
+          </TerminalActions>
+        </div>
+      </TerminalHeader>
+      <TerminalContent />
+    </Terminal>
   ) : (
     part.output
   );
