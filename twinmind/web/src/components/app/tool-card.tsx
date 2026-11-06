@@ -97,7 +97,14 @@ export function ToolCard({ part, provider }: { part: ToolPart; provider: Provide
 
   return (
     <Tool open={open} onOpenChange={setOpen}>
-      <ToolHeader type="dynamic-tool" toolName={displayName(part)} title={`${displayName(part)}: ${part.title}`} state={state} />
+      {/* Long commands wrap and the status badge moves below on phones instead of overflowing the card. */}
+      <ToolHeader
+        type="dynamic-tool"
+        toolName={displayName(part)}
+        title={`${displayName(part)}: ${part.title}`}
+        state={state}
+        className="text-left [&>div]:min-w-0 [&>div>span:first-of-type]:min-w-0 [&>div>span:first-of-type]:[overflow-wrap:anywhere] [&_svg]:shrink-0 max-sm:[&>div]:flex-wrap max-sm:[&>div>span:first-of-type]:basis-[calc(100%-1.5rem)]"
+      />
       <ToolContent>
         <ToolInput input={part.input} />
         <ToolOutput output={output} errorText={part.state === "error" ? (part.error ?? "The tool failed.") : undefined} />
