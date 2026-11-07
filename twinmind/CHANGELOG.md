@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.6
+
+- The composer no longer jumps to two lines when you pick a long mode such as "Accept edits".
+- Landscape on phones: the welcome text no longer overlaps the composer.
+- The prompt suggestions line up with the composer on desktop.
+
 ## 0.3.5
 
 - Copy buttons work when Home Assistant is opened over http:// and in the companion app.
