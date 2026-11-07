@@ -249,8 +249,8 @@ function AssistantSelector() {
   if (!current) return null;
   const selectedModel = models[providerId] ?? "";
   const model = current.models.find((m) => m.id === selectedModel);
-  // The logo already says which assistant it is: show the model only when one is picked.
-  const shortLabel = model?.id ? model.label : current.label;
+  // The logo already says which assistant it is: the button names the model.
+  const shortLabel = model?.label ?? "Default";
 
   const select = (p: ProviderId, model: string) => {
     setProvider(p);
@@ -261,7 +261,7 @@ function AssistantSelector() {
   return (
     <ModelSelector open={open} onOpenChange={setOpen}>
       <ModelSelectorTrigger asChild>
-        <PromptInputButton aria-label={`Assistant and model: ${current.label}, ${model?.id ? model.label : "default model"}`} className="min-w-0 shrink gap-1.5 px-2">
+        <PromptInputButton aria-label={`Assistant and model: ${current.label}, ${shortLabel}`} className="min-w-0 shrink gap-1.5 px-2">
           <ModelSelectorLogo provider={PROVIDER_LOGO[providerId]} className="shrink-0" />
           <ModelSelectorName className="max-[374px]:hidden">{shortLabel}</ModelSelectorName>
         </PromptInputButton>
