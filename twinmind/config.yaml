@@ -1,5 +1,5 @@
 name: Twinmind
-version: "0.3.7"
+version: "0.3.8"
 slug: twinmind
 description: Chat with Claude and Codex about your Home Assistant setup, from any phone.
 url: https://github.com/Gokaku/homeassistant-twinmind

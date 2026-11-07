@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.8
+
+- The composer tools fit on phones: the model button shows just "Claude"/"Codex" or the picked
+  model (only the logo on very narrow screens) instead of cut-off text.
+
 ## 0.3.7
 
 - More space between the mode picker and the send button, and above the composer.
