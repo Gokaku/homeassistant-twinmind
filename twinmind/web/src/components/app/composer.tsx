@@ -178,7 +178,7 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
             <AssistantSelector />
             {info && (
               <PromptInputSelect value={mode} onValueChange={(v) => setMode(providerId, v)}>
-                <PromptInputSelectTrigger aria-label="Permission mode" className="shrink-0">
+                <PromptInputSelectTrigger aria-label="Permission mode" className="shrink-0 gap-1 px-2">
                   <PromptInputSelectValue />
                 </PromptInputSelectTrigger>
                 <PromptInputSelectContent>
@@ -248,7 +248,9 @@ function AssistantSelector() {
   const current = providers.find((p) => p.id === providerId);
   if (!current) return null;
   const selectedModel = models[providerId] ?? "";
-  const modelLabel = current.models.find((m) => m.id === selectedModel)?.label ?? "Default";
+  const model = current.models.find((m) => m.id === selectedModel);
+  // The logo already says which assistant it is: show the model only when one is picked.
+  const shortLabel = model?.id ? model.label : current.label;
 
   const select = (p: ProviderId, model: string) => {
     setProvider(p);
@@ -259,11 +261,9 @@ function AssistantSelector() {
   return (
     <ModelSelector open={open} onOpenChange={setOpen}>
       <ModelSelectorTrigger asChild>
-        <PromptInputButton aria-label="Assistant and model" className="min-w-0 shrink">
+        <PromptInputButton aria-label={`Assistant and model: ${current.label}, ${model?.id ? model.label : "default model"}`} className="min-w-0 shrink gap-1.5 px-2">
           <ModelSelectorLogo provider={PROVIDER_LOGO[providerId]} className="shrink-0" />
-          <ModelSelectorName>
-            {current.label} · {modelLabel}
-          </ModelSelectorName>
+          <ModelSelectorName className="max-[374px]:hidden">{shortLabel}</ModelSelectorName>
         </PromptInputButton>
       </ModelSelectorTrigger>
       <ModelSelectorContent title="Assistant and model">
