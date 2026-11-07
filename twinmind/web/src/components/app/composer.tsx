@@ -102,7 +102,7 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
   const status = pending ? "submitted" : running ? "streaming" : undefined;
 
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-2 px-3 pb-safe">
+    <div className="mx-auto grid w-full max-w-3xl grid-cols-[minmax(0,1fr)] gap-2 px-3 pb-safe">
       {info && !signedIn && (
         <Item variant="outline">
           <ItemContent className="min-w-0">
@@ -153,7 +153,7 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
           />
         </PromptInputBody>
         <PromptInputFooter>
-          <PromptInputTools className="min-w-0 flex-wrap">
+          <PromptInputTools className="min-w-0 flex-1">
             <PromptInputActionMenu>
               <PromptInputActionMenuTrigger aria-label="Add attachments" />
               <PromptInputActionMenuContent>
@@ -178,7 +178,7 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
             <AssistantSelector />
             {info && (
               <PromptInputSelect value={mode} onValueChange={(v) => setMode(providerId, v)}>
-                <PromptInputSelectTrigger aria-label="Permission mode">
+                <PromptInputSelectTrigger aria-label="Permission mode" className="shrink-0">
                   <PromptInputSelectValue />
                 </PromptInputSelectTrigger>
                 <PromptInputSelectContent>
@@ -259,8 +259,8 @@ function AssistantSelector() {
   return (
     <ModelSelector open={open} onOpenChange={setOpen}>
       <ModelSelectorTrigger asChild>
-        <PromptInputButton aria-label="Assistant and model">
-          <ModelSelectorLogo provider={PROVIDER_LOGO[providerId]} />
+        <PromptInputButton aria-label="Assistant and model" className="min-w-0 shrink">
+          <ModelSelectorLogo provider={PROVIDER_LOGO[providerId]} className="shrink-0" />
           <ModelSelectorName>
             {current.label} · {modelLabel}
           </ModelSelectorName>
