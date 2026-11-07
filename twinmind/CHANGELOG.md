@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.9
+
+- The model button shows the selected model (e.g. Default, Opus, Sonnet) next to the logo.
+
 ## 0.3.8
 
 - The composer tools fit on phones: the model button shows just "Claude"/"Codex" or the picked
