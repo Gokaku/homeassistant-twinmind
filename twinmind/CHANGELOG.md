@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.7
+
+- More space between the mode picker and the send button, and above the composer.
+
 ## 0.3.6
 
 - The composer no longer jumps to two lines when you pick a long mode such as "Accept edits".

@@ -50,7 +50,7 @@ LABEL \
   io.hass.name="Twinmind" \
   io.hass.description="Claude and Codex chat for Home Assistant" \
   io.hass.type="addon" \
-  io.hass.version="0.3.6" \
+  io.hass.version="0.3.7" \
   org.opencontainers.image.source="https://github.com/Gokaku/homeassistant-twinmind"
 
 CMD ["/run.sh"]
