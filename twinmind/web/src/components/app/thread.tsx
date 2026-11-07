@@ -77,18 +77,23 @@ function EmptyState({ onSuggestion }: { onSuggestion: (s: string) => void }) {
   const provider = useStore((s) => s.provider);
   const first = user?.name?.split(" ")[0];
   return (
-    <div className="flex flex-1 flex-col">
+    // Scrolls instead of running under the composer when there is little height (phones in
+    // landscape); the welcome text is dropped there so the suggestions stay visible.
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <ConversationEmptyState
-        className="flex-1"
+        className="flex-1 [@media(max-height:480px)]:hidden"
         icon={<img src={APP_ICON} alt="" className="size-12" />}
         title={first ? `Hi ${first}` : "Twinmind"}
         description={`Ask ${PROVIDER_NAME[provider]} about your home. Switch assistants any time; the other one picks up the conversation.`}
       />
-      <Suggestions className="px-4 pb-4">
-        {SUGGESTIONS.map((s) => (
-          <Suggestion key={s} suggestion={s} onClick={onSuggestion} />
-        ))}
-      </Suggestions>
+      {/* Same width as the composer below. */}
+      <div className="mx-auto mt-auto w-full max-w-3xl px-3 pt-3 pb-2">
+        <Suggestions>
+          {SUGGESTIONS.map((s) => (
+            <Suggestion key={s} suggestion={s} onClick={onSuggestion} />
+          ))}
+        </Suggestions>
+      </div>
     </div>
   );
 }
