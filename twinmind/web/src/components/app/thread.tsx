@@ -87,7 +87,7 @@ function EmptyState({ onSuggestion }: { onSuggestion: (s: string) => void }) {
         description={`Ask ${PROVIDER_NAME[provider]} about your home. Switch assistants any time; the other one picks up the conversation.`}
       />
       {/* Same width as the composer below. */}
-      <div className="mx-auto mt-auto w-full max-w-3xl px-3 pt-3 pb-2">
+      <div className="mx-auto mt-auto w-full max-w-3xl px-3 pt-3 pb-3">
         <Suggestions>
           {SUGGESTIONS.map((s) => (
             <Suggestion key={s} suggestion={s} onClick={onSuggestion} />

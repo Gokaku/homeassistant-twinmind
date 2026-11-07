@@ -152,7 +152,7 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
             enterKeyHint={isTouch() ? "enter" : "send"}
           />
         </PromptInputBody>
-        <PromptInputFooter>
+        <PromptInputFooter className="gap-2">
           <PromptInputTools className="min-w-0 flex-1">
             <PromptInputActionMenu>
               <PromptInputActionMenuTrigger aria-label="Add attachments" />
