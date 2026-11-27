@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { HassClient } from "./client.js";
+import { classifyRaw } from "./raw.js";
 
 /**
  * Home Assistant tools offered to both assistants (over MCP).
@@ -21,59 +22,6 @@ export interface HaTool<S extends z.ZodRawShape = z.ZodRawShape> {
 
 const MAX_RESULT_CHARS = 60_000;
 
-/**
- * Raw WebSocket commands that only read and return nothing secret: they run without approval.
- * An explicit list, not a pattern: some reads return secrets (application_credentials/list
- * returns OAuth client secrets), and a name says nothing certain about side effects.
- */
-export const HA_WS_READ_COMMANDS = new Set([
-  "get_states",
-  "get_config",
-  "get_services",
-  "get_panels",
-  "config/entity_registry/list",
-  "config/entity_registry/list_for_display",
-  "config/entity_registry/get",
-  "config/entity_registry/get_entries",
-  "config/device_registry/list",
-  "config/area_registry/list",
-  "config/floor_registry/list",
-  "config/label_registry/list",
-  "config/category_registry/list",
-  "config_entries/get",
-  "config_entries/get_single",
-  "config_entries/subentries/list",
-  "config_entries/flow/progress",
-  "lovelace/config",
-  "lovelace/dashboards/list",
-  "lovelace/resources",
-  "lovelace/info",
-  "manifest/list",
-  "manifest/get",
-  "integration/descriptions",
-  "repairs/list_issues",
-  "search/related",
-  "backup/info",
-  "energy/get_prefs",
-  "recorder/info",
-  "logger/log_info",
-  "person/list",
-  "zone/list",
-  "tag/list",
-  "input_boolean/list",
-  "input_button/list",
-  "input_datetime/list",
-  "input_number/list",
-  "input_select/list",
-  "input_text/list",
-  "counter/list",
-  "timer/list",
-  "schedule/list",
-  "trace/list",
-  "trace/get",
-  "automation/config",
-  "script/config",
-]);
 
 function tool<S extends z.ZodRawShape>(t: HaTool<S>): HaTool<S> {
   return t;
@@ -521,9 +469,9 @@ export const HA_TOOLS: HaTool<any>[] = [
     name: "ha_websocket",
     title: "Raw WebSocket command",
     description:
-      "Admin escape hatch: send any Home Assistant WebSocket API command (e.g. 'config/label_registry/create', 'config/floor_registry/list', 'backup/info'). Prefer the specific tools when they fit. Known read-only commands (get_states, config_entries/get, lovelace/config, lovelace/dashboards/list, */list registries, ...) run without asking the user; anything else needs their approval.",
+      "Admin escape hatch: send any Home Assistant WebSocket API command (e.g. 'config/label_registry/create', 'config/floor_registry/list', 'backup/info'). Prefer the specific tools when they fit. Read-only commands (get_states, */list, */get, lovelace/config, ...) run without asking; changes follow the chat's permission mode; commands about users, tokens, sign-in, Supervisor, backups and cloud always need the user's approval.",
     readOnly: false,
-    readOnlyCall: (a) => HA_WS_READ_COMMANDS.has(a.type),
+    readOnlyCall: (a) => classifyRaw("ha_websocket", a)?.kind === "read",
     input: { type: z.string().regex(/^[\w/.-]+$/), payload: z.record(z.string(), z.unknown()).optional() },
     summary: (a) => a.type,
     async run(ha, a) {
@@ -535,9 +483,9 @@ export const HA_TOOLS: HaTool<any>[] = [
     name: "ha_rest",
     title: "Raw REST call",
     description:
-      "Admin escape hatch: call the Home Assistant Core REST API (path relative to /api, e.g. '/config/scene/config/123'). GET requests run without asking the user; POST and DELETE need their approval.",
+      "Admin escape hatch: call the Home Assistant Core REST API (path relative to /api, e.g. '/config/scene/config/123'). GET requests run without asking; POST and DELETE follow the chat's permission mode; /auth, /hassio, /cloud, /onboarding and /backup always need the user's approval.",
     readOnly: false,
-    readOnlyCall: (a) => a.method === "GET",
+    readOnlyCall: (a) => classifyRaw("ha_rest", a)?.kind === "read",
     input: { method: z.enum(["GET", "POST", "DELETE"]), path: z.string().startsWith("/"), body: z.unknown().optional() },
     summary: (a) => `${a.method} ${a.path}`,
     async run(ha, a) {
@@ -553,9 +501,3 @@ export function formatResult(value: unknown): string {
 
 export const HA_READ_ONLY = new Set(HA_TOOLS.filter((t) => t.readOnly).map((t) => t.name));
 
-/**
- * The raw escape hatches can do anything the Supervisor token can (create tokens, delete
- * things, ...). "Always" on one harmless call must not pre-approve every later one, so they
- * are approved one call at a time.
- */
-export const HA_ALWAYS_ASK = new Set(["ha_websocket", "ha_rest"]);

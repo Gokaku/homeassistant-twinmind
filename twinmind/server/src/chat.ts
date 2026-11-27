@@ -2,7 +2,8 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { buildPrompt } from "./handoff.js";
 import type { GateDecision, McpEndpoint, ToolGate } from "./hass/mcp.js";
 import { haPolicy } from "./hass/policy.js";
-import { HA_ALWAYS_ASK, type HaTool } from "./hass/tools.js";
+import { classifyRaw } from "./hass/raw.js";
+import type { HaTool } from "./hass/tools.js";
 import type {
   ApprovalDecision,
   ChatMessage,
@@ -93,12 +94,16 @@ export class ChatService implements ToolGate {
     // still running: a request that outlived its turn must not run with that turn's mode
     // (or put an approval card on a reply that has already ended).
     if (this.running.get(cid) !== turn) return { ok: false, reason: "This reply has already ended." };
-    const policy = haPolicy(turn.provider, turn.mode, tool.name);
+    // Raw WebSocket/REST calls are judged by what they do; "Always" remembers that one command.
+    const raw = classifyRaw(tool.name, args);
+    const sensitive = raw?.kind === "sensitive";
+    const key = raw?.key ?? tool.name;
+    const policy = haPolicy(turn.provider, turn.mode, sensitive);
     if (policy === "allow") return { ok: true };
     if (policy === "read-only")
       return { ok: false, reason: `This chat is in a read-only mode (${turn.mode}). Describe the change instead; the user can switch modes to apply it.` };
     if (policy === "deny") return { ok: false, reason: `Changes are not allowed in this mode (${turn.mode}).` };
-    if (this.sessionAllowed.get(cid)?.has(tool.name)) return { ok: true };
+    if (!sensitive && this.sessionAllowed.get(cid)?.has(key)) return { ok: true };
     if (!turn.requestApproval) return { ok: false, reason: "No one is there to approve this right now." };
     // Put the approval on the assistant's own card for this tool call, if we can find it.
     const part = [...(turn.assistant?.parts ?? [])]
@@ -116,14 +121,14 @@ export class ChatService implements ToolGate {
       kind: "ha",
       title: summary,
       input: args,
-      reason: tool.title,
+      reason: sensitive ? `${tool.title} (sensitive: always asks)` : tool.title,
       signal,
     });
     if (signal?.aborted) return { ok: false, reason: "The tool call was cancelled before it was approved." };
     if (decision === "deny") return { ok: false, reason: "The user declined this change." };
-    if (decision === "allow-session" && !HA_ALWAYS_ASK.has(tool.name)) {
+    if (decision === "allow-session" && !sensitive) {
       if (!this.sessionAllowed.has(cid)) this.sessionAllowed.set(cid, new Set());
-      this.sessionAllowed.get(cid)!.add(tool.name);
+      this.sessionAllowed.get(cid)!.add(key);
     }
     return { ok: true };
   }

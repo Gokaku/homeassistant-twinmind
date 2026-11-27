@@ -1,5 +1,4 @@
 import type { ProviderId } from "../protocol.js";
-import { HA_ALWAYS_ASK } from "./tools.js";
 
 /**
  * What happens when an assistant wants to change something in Home Assistant
@@ -12,19 +11,20 @@ import { HA_ALWAYS_ASK } from "./tools.js";
  */
 export type HaPolicy = "allow" | "ask" | "read-only" | "deny";
 
-export function haPolicy(provider: ProviderId, mode: string, tool?: string): HaPolicy {
+/** `sensitive`: users, tokens, Supervisor, ... (see raw.ts); Auto asks for those. */
+export function haPolicy(provider: ProviderId, mode: string, sensitive = true): HaPolicy {
   if (provider === "claude") {
     if (mode === "bypassPermissions") return "allow";
     if (mode === "plan") return "read-only";
     if (mode === "dontAsk") return "deny";
-    // Auto: regular HA changes run unasked; raw WebSocket/REST calls can do anything, so they still ask.
-    if (mode === "auto") return tool && !HA_ALWAYS_ASK.has(tool) ? "allow" : "ask";
+    // Auto: ordinary HA changes run unasked; sensitive ones (users, tokens, Supervisor, ...) ask.
+    if (mode === "auto") return sensitive ? "ask" : "allow";
     return "ask"; // default, acceptEdits
   }
   if (provider === "codex") {
     if (mode === "full-access") return "allow";
     if (mode === "read-only") return "read-only";
-    if (mode === "auto") return tool && !HA_ALWAYS_ASK.has(tool) ? "allow" : "ask";
+    if (mode === "auto") return sensitive ? "ask" : "allow";
     return "ask"; // untrusted
   }
   if (mode === "auto") return "allow";

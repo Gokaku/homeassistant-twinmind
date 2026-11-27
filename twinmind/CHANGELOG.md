@@ -2,11 +2,14 @@
 
 ## 0.4.1
 
-- No more approval cards for raw Home Assistant commands that only read: known read-only
-  WebSocket commands (e.g. `config_entries/get`, `lovelace/config`,
-  `lovelace/dashboards/list`, the registry lists) and REST `GET` requests run without asking,
-  in every mode. Raw commands that change something still ask every time, as do reads that
-  can return secrets (e.g. `application_credentials/list`).
+- Raw Home Assistant commands (the WebSocket/REST escape hatches) are judged by what they do
+  instead of always asking:
+  - **Reads** (`config_entries/get`, `lovelace/config`, `…/list`, `…/get`, REST `GET`, ...)
+    run without asking, in every mode.
+  - **Ordinary changes** (delete an integration, create an area, ...) are treated like the
+    other HA tools: no question in Auto, and *Always* applies to that one command.
+  - **Sensitive** commands (users, tokens, sign-in, Supervisor, backups, cloud, OAuth
+    credentials) ask every time unless the mode never asks (Full access / Bypass).
 
 ## 0.4.0
 
