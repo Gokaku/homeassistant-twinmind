@@ -13,8 +13,8 @@ receives the transcript and carries on.
 2. Install **Twinmind**, start it, and open it from the sidebar.
 3. Sign in to Claude and/or Codex from the person icon. See [DOCS.md](twinmind/DOCS.md).
 
-> **Status: early (0.3.x), not yet tested on a real Home Assistant installation.** Expect
-> rough edges and please report what breaks.
+> **Status:** in daily use on a real Home Assistant installation. Still young, so please
+> report anything that breaks.
 
 ## Features
 
