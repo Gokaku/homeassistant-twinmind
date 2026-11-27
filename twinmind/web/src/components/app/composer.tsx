@@ -47,6 +47,7 @@ import type { ProviderId } from "@/lib/protocol";
 import {
   currentEffort,
   currentMode,
+  getState,
   currentModel,
   interrupt,
   sendMessage,
@@ -90,8 +91,6 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
     return undefined;
   });
   const controller = usePromptInputController();
-  const runningRef = useRef(running);
-  runningRef.current = running;
   const modeInfo = info?.modes.find((m) => m.id === mode);
   const signedIn = info?.auth.state === "signed-in";
 
@@ -102,15 +101,26 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
 
   const onSubmit = useCallback(async (msg: PromptInputMessage) => {
     if (!msg.text.trim() && msg.files.length === 0) return;
-    if (runningRef.current) {
-      toast("Wait for the reply to finish, or stop it first.", "info");
-      throw new Error("busy"); // keeps the text in the box
-    }
+    // While a reply is running, the message goes into it (or waits for it): see ChatService.followUp.
     const ok = await sendMessage(msg.text, msg.files.map((f) => ({ url: f.url, mediaType: f.mediaType, filename: f.filename })));
     if (!ok) throw new Error("not sent"); // keeps the text in the box
   }, []);
 
-  const status = pending ? "submitted" : running ? "streaming" : undefined;
+  // While a reply runs the button stops it, unless there is something to send along.
+  const hasDraft = !!controller.textInput.value.trim() || controller.attachments.files.length > 0;
+  const status = pending ? "submitted" : running && !hasDraft ? "streaming" : undefined;
+  const stop = () => {
+    if (!currentId) return;
+    // Stopping also drops the messages waiting behind the reply: put them back in the box.
+    const conv = getState().details[currentId];
+    const queued = (conv?.messages ?? []).filter((m) => m.role === "user" && m.queued);
+    const texts = queued.flatMap((m) => m.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])));
+    interrupt(currentId);
+    if (texts.length) {
+      const cur = controller.textInput.value.trim();
+      controller.textInput.setInput([...texts, ...(cur ? [cur] : [])].join("\n\n"));
+    }
+  };
 
   return (
     <div className="mx-auto grid w-full max-w-3xl grid-cols-[minmax(0,1fr)] gap-2 px-3 pb-safe">
@@ -157,7 +167,7 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
         </PromptInputHeader>
         <PromptInputBody>
           <PromptInputTextarea
-            placeholder={`Message ${info?.label ?? "Twinmind"}…`}
+            placeholder={running ? `Add to the reply, or send a follow-up…` : `Message ${info?.label ?? "Twinmind"}…`}
             // On phones Enter adds a new line and the send button sends.
             submitOnEnter={!isTouch()}
             enterKeyHint={isTouch() ? "enter" : "send"}
@@ -225,7 +235,7 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
           <PromptInputSubmit
             status={status}
             disabled={!connected || pending || !signedIn}
-            onStop={() => currentId && interrupt(currentId)}
+            onStop={stop}
           />
         </PromptInputFooter>
       </PromptInput>

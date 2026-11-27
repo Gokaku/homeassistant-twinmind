@@ -95,6 +95,8 @@ export interface ChatMessage {
   createdAt: number;
   status?: "streaming" | "completed" | "interrupted" | "failed";
   usage?: TokenUsage;
+  /** User message sent while a reply was running; it is sent when that reply ends. */
+  queued?: boolean;
 }
 
 export interface ConversationMeta {
@@ -184,6 +186,8 @@ export type ClientMessage =
   /** Answer a question part; answers null = dismiss. */
   | { type: "answer"; questionPartId: string; answers: Record<string, string[]> | null }
   | { type: "interrupt"; conversationId: string }
+  /** Remove a queued message before it is sent. */
+  | { type: "unqueue"; conversationId: string; messageId: string }
   /** Ask for a snapshot of a conversation (ordered with the live events on this socket). */
   | { type: "subscribe"; conversationId: string }
   | { type: "ping" };
@@ -198,6 +202,7 @@ export type ServerEvent =
   /** Full state of a conversation, answer to "subscribe". Events after it on the same socket are newer. */
   | { type: "snapshot"; conversation: Conversation & { running?: boolean } }
   | { type: "message"; conversationId: string; message: ChatMessage }
+  | { type: "message.removed"; conversationId: string; messageId: string }
   | { type: "text.delta"; conversationId: string; messageId: string; partId: string; delta: string }
   | { type: "reasoning.delta"; conversationId: string; messageId: string; partId: string; delta: string }
   | { type: "usage"; conversationId: string; messageId: string; usage: TokenUsage }

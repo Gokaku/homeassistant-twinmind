@@ -9,6 +9,7 @@ import { agentEnv } from "./env.js";
 import { effortLabel, pickModel } from "./models.js";
 import { stringifyOutput, truncate } from "./tooltext.js";
 import type { NativeSession, Provider, TurnContext } from "./types.js";
+import type { StoredUpload } from "../uploads.js";
 
 /** Environment variable the app-server reads the MCP bearer secret from. */
 const MCP_SECRET_VAR = "TWINMIND_MCP_SECRET";
@@ -53,6 +54,15 @@ const MODES: (ModeInfo & Policy)[] = [
 
 
 /** Twinmind's model list from Codex's model/list result. Exactly one model is the default. */
+/** Codex input items for a message: the text (with other files listed by path) and images. */
+export function codexInput(text: string, attachments: StoredUpload[]): any[] {
+  const others = attachments.filter((a) => !a.mediaType.startsWith("image/"));
+  const full = others.length ? `${text}\n\nAttached files:\n${others.map((a) => `- ${a.path} (${a.name}, ${a.mediaType})`).join("\n")}` : text;
+  const input: any[] = [{ type: "text", text: full, text_elements: [] }];
+  for (const a of attachments) if (a.mediaType.startsWith("image/")) input.push({ type: "localImage", path: a.path });
+  return input;
+}
+
 export function modelsFromList(r: any): ModelInfo[] {
   const list: ModelInfo[] = (r?.data ?? [])
     .filter((m: any) => !m.hidden)
@@ -265,8 +275,7 @@ export class CodexProvider implements Provider {
     const threadId: string = started.thread.id;
     if (this.turns.has(threadId)) throw new Error("This Codex thread is already busy");
 
-    const input: any[] = [{ type: "text", text: this.promptWithFiles(ctx), text_elements: [] }];
-    for (const a of ctx.attachments) if (a.mediaType.startsWith("image/")) input.push({ type: "localImage", path: a.path });
+    const input = codexInput(ctx.prompt, ctx.attachments);
 
     return new Promise<{ status: "completed" | "interrupted" }>((resolve, reject) => {
       const turn: ActiveTurn = {
@@ -306,15 +315,19 @@ export class CodexProvider implements Provider {
           // Only now is the thread real (persisted by Codex): remember it for this chat.
           ctx.emit({ type: "native-id", id: threadId });
           if (ctx.signal.aborted) onAbort();
+          // Messages sent while this turn runs go into it (Codex's turn/steer), as in the Codex app.
+          ctx.setSteer?.(async ({ text, attachments }) => {
+            if (!turn.turnId || this.turns.get(threadId) !== turn || ctx.signal.aborted) return false;
+            try {
+              await rpc.call("turn/steer", { threadId, input: codexInput(text, attachments), expectedTurnId: turn.turnId }, 15_000);
+              return true;
+            } catch {
+              return false; // the turn ended or cannot be steered: Twinmind queues the message
+            }
+          });
         })
         .catch((e) => turn.reject(e));
     });
-  }
-
-  private promptWithFiles(ctx: TurnContext): string {
-    const others = ctx.attachments.filter((a) => !a.mediaType.startsWith("image/"));
-    if (!others.length) return ctx.prompt;
-    return `${ctx.prompt}\n\nAttached files:\n${others.map((a) => `- ${a.path} (${a.name}, ${a.mediaType})`).join("\n")}`;
   }
 
   private toolFromItem(item: any): ToolPart | null {

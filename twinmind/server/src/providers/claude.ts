@@ -22,6 +22,7 @@ import { agentEnv } from "./env.js";
 import { effortLabel, pickModel } from "./models.js";
 import { describeTool, stringifyOutput, truncate } from "./tooltext.js";
 import type { NativeSession, Provider, TurnContext } from "./types.js";
+import type { StoredUpload } from "../uploads.js";
 
 const require = createRequire(import.meta.url);
 
@@ -160,6 +161,31 @@ export const THINKING = { type: "adaptive", display: "summarized" } as const;
 
 export function sessionOnly(suggestions: PermissionUpdate[] | undefined): PermissionUpdate[] | undefined {
   return suggestions?.map((s) => ({ ...s, destination: "session" as const }));
+}
+
+/** A user message for Claude Code: images as content blocks, other files referenced by path. */
+function userMessage(prompt: string, attachments: StoredUpload[], uuid: string): SDKUserMessage {
+  const images = attachments.filter((a) => /^image\/(png|jpeg|gif|webp)$/.test(a.mediaType));
+  const others = attachments.filter((a) => !images.includes(a));
+  let text = prompt;
+  if (others.length) {
+    text += `\n\nAttached files (read them with your tools):\n${others.map((a) => `- ${a.path} (${a.name}, ${a.mediaType})`).join("\n")}`;
+  }
+  return {
+    type: "user",
+    uuid: uuid as `${string}-${string}-${string}-${string}-${string}`,
+    parent_tool_use_id: null,
+    message: {
+      role: "user",
+      content: [
+        ...images.map((img) => ({
+          type: "image" as const,
+          source: { type: "base64" as const, media_type: img.mediaType as "image/png", data: fs.readFileSync(img.path).toString("base64") },
+        })),
+        { type: "text" as const, text },
+      ],
+    },
+  };
 }
 
 /** CLAUDE.md in /config, passed as plain text (settings files are not loaded). */
@@ -406,36 +432,37 @@ export class ClaudeProvider implements Provider {
       };
     };
 
-    // Images go in as content blocks; other files are referenced by path.
-    const images = ctx.attachments.filter((a) => /^image\/(png|jpeg|gif|webp)$/.test(a.mediaType));
-    const others = ctx.attachments.filter((a) => !images.includes(a));
-    let text = ctx.prompt;
-    if (others.length) {
-      text += `\n\nAttached files (read them with your tools):\n${others.map((a) => `- ${a.path} (${a.name}, ${a.mediaType})`).join("\n")}`;
-    }
-    let finish: () => void = () => {};
-    const done = new Promise<void>((r) => (finish = r));
+    // The input stays open for the whole turn: messages the user sends meanwhile go into it.
+    const firstUuid = randomUUID();
+    const outbox: SDKUserMessage[] = [userMessage(ctx.prompt, ctx.attachments, firstUuid)];
+    let wake: (() => void) | null = null;
+    let closed = false;
+    const finish = () => {
+      closed = true;
+      wake?.();
+    };
     async function* input(): AsyncIterable<SDKUserMessage> {
-      yield {
-        type: "user",
-        parent_tool_use_id: null,
-        message: {
-          role: "user",
-          content: [
-            ...images.map((img) => ({
-              type: "image" as const,
-              source: {
-                type: "base64" as const,
-                media_type: img.mediaType as "image/png",
-                data: fs.readFileSync(img.path).toString("base64"),
-              },
-            })),
-            { type: "text" as const, text },
-          ],
-        },
-      };
-      await done; // keep input open until the turn's result arrives
+      while (!closed) {
+        const next = outbox.shift();
+        if (next) yield next;
+        else await new Promise<void>((r) => (wake = r));
+      }
     }
+    /** Steered messages Claude Code has not reported as taken into a reply yet. */
+    const pending = new Set<string>();
+    /** Claude Code reports which user messages each reply answers (user_message_uuids). */
+    let stamped = false;
+    let ended = false;
+    ctx.setSteer?.(async ({ text, attachments }) => {
+      // Without the reports, a steered message could be dropped unnoticed when the turn ends:
+      // then Twinmind queues it instead.
+      if (ended || !stamped || ctx.signal.aborted) return false;
+      const uuid = randomUUID();
+      pending.add(uuid);
+      outbox.push({ ...userMessage(text, attachments, uuid), priority: "next" });
+      wake?.();
+      return true;
+    });
 
     // Claude refuses bypass mode as root unless told it is in a sandbox (the add-on container).
     const env = agentEnv(mode === "bypassPermissions" ? { IS_SANDBOX: "1" } : {});
@@ -478,8 +505,15 @@ export class ClaudeProvider implements Provider {
     try {
       for await (const m of q as AsyncIterable<SDKMessage>) {
         if (ctx.signal.aborted) break;
+        const taken: string[] = (m as any).user_message_uuids ?? ((m as any).user_message_uuid ? [(m as any).user_message_uuid] : []);
+        for (const u of taken) {
+          if (u === firstUuid) stamped = true;
+          pending.delete(u);
+        }
         this.handle(m, ctx, st);
         if (m.type === "result") {
+          // Messages steered in too late for this reply get one of their own: keep reading.
+          if (pending.size && !resultError && m.subtype === "success" && !m.is_error) continue;
           // The main model has the largest context window among the models used.
           const windows = Object.values((m as any).modelUsage ?? {}).map((x: any) => Number(x?.contextWindow) || 0);
           if (windows.length) st.contextWindow = Math.max(...windows);
@@ -491,6 +525,7 @@ export class ClaudeProvider implements Provider {
         }
       }
     } finally {
+      ended = true;
       finish();
       ctx.signal.removeEventListener("abort", onAbort);
       try {

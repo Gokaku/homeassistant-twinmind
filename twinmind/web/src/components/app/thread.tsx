@@ -21,7 +21,7 @@ import {
 } from "@/components/ai-elements/queue";
 import { uploadUrl } from "@/lib/api";
 import type { ChatMessage, Part, ProviderId } from "@/lib/protocol";
-import { toast, useStore } from "@/lib/store";
+import { toast, unqueue, useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangleIcon,
@@ -30,6 +30,8 @@ import {
   CopyIcon,
   InfoIcon,
   ListTodoIcon,
+  ClockIcon,
+  XIcon,
 } from "lucide-react";
 import { memo, useState } from "react";
 import { ModelSelectorLogo } from "@/components/ai-elements/model-selector";
@@ -64,7 +66,7 @@ export function Thread({ onSuggestion }: { onSuggestion: (s: string) => void }) 
     <Conversation className="flex-1">
       <ConversationContent className="mx-auto w-full max-w-3xl gap-6 px-4 pt-4 pb-6">
         {current.messages.map((m, i) => (
-          <MessageView key={m.id} message={m} previous={current.messages[i - 1]} />
+          <MessageView key={m.id} conversationId={current.id} message={m} previous={current.messages[i - 1]} last={i === current.messages.length - 1} />
         ))}
       </ConversationContent>
       <ConversationScrollButton aria-label="Scroll to latest message" className="bottom-3 shadow-md" />
@@ -98,7 +100,17 @@ function EmptyState({ onSuggestion }: { onSuggestion: (s: string) => void }) {
   );
 }
 
-const MessageView = memo(function MessageView({ message: m, previous }: { message: ChatMessage; previous?: ChatMessage }) {
+const MessageView = memo(function MessageView({
+  conversationId,
+  message: m,
+  previous,
+  last,
+}: {
+  conversationId: string;
+  message: ChatMessage;
+  previous?: ChatMessage;
+  last: boolean;
+}) {
   if (m.role === "user") {
     const files = m.parts.filter((p) => p.type === "file");
     const texts = m.parts.filter((p) => p.type === "text");
@@ -106,7 +118,7 @@ const MessageView = memo(function MessageView({ message: m, previous }: { messag
     return (
       <>
         {switched && <Handoff to={m.provider} />}
-        <Message from="user">
+        <Message from="user" className={cn(m.queued && "opacity-70")}>
           {files.length > 0 && (
             <div className="ml-auto flex flex-wrap justify-end gap-2">
               {files.map((f) => (f.type === "file" ? <FileChip key={f.id} part={f} /> : null))}
@@ -116,6 +128,15 @@ const MessageView = memo(function MessageView({ message: m, previous }: { messag
             <MessageContent>
               {texts.map((t) => (t.type === "text" ? <p key={t.id} className="whitespace-pre-wrap break-words">{t.text}</p> : null))}
             </MessageContent>
+          )}
+          {m.queued && (
+            <div className="ml-auto flex items-center gap-1 text-muted-foreground text-xs">
+              <ClockIcon className="size-3.5" />
+              Sends when the reply is done
+              <MessageAction label="Remove queued message" tooltip="Remove" onClick={() => unqueue(conversationId, m.id)}>
+                <XIcon className="size-3.5" />
+              </MessageAction>
+            </div>
           )}
         </Message>
       </>
@@ -134,7 +155,8 @@ const MessageView = memo(function MessageView({ message: m, previous }: { messag
         {m.status === "interrupted" && <Badge variant="outline">stopped</Badge>}
       </div>
       <MessageContent className="w-full">
-        {empty && streaming && <Shimmer className="text-sm">Thinking…</Shimmer>}
+        {/* An earlier part of a reply that a steered message split stays quiet. */}
+        {empty && streaming && last && <Shimmer className="text-sm">Thinking…</Shimmer>}
         {m.parts.map((p, i) => (
           <PartView key={p.id} part={p} provider={m.provider} streaming={streaming && i === m.parts.length - 1} />
         ))}

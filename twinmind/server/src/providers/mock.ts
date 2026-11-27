@@ -46,6 +46,9 @@ export class MockProvider implements Provider {
   async run(ctx: TurnContext): Promise<{ status: "completed" | "interrupted" }> {
     const { emit, signal } = ctx;
     emit({ type: "native-id", id: ctx.nativeId ?? `mock-${randomUUID()}` });
+    // Messages sent while this reply runs are taken into it and answered at the end.
+    const steered: string[] = [];
+    ctx.setSteer?.(async ({ text }) => (signal.aborted ? false : (steered.push(text), true)));
     const stream = async (kind: "text-delta" | "reasoning-delta", partId: string, text: string) => {
       for (const word of text.split(/(?<= )/)) {
         await sleep(this.delayMs, signal);
@@ -162,6 +165,7 @@ export class MockProvider implements Provider {
       randomUUID(),
       `You said: **${ctx.prompt.slice(0, 200)}**.${files}\n\nTwo automations touch lights:\n\n- \`light.kitchen\`\n- \`light.hallway\`\n\n\`\`\`yaml\nalias: Hallway at night\ntrigger:\n  - platform: sun\n    event: sunset\n\`\`\`\n`,
     );
+    for (const text of steered.splice(0)) await stream("text-delta", randomUUID(), `You added while I was working: **${text.slice(0, 200)}**. `);
     return { status: "completed" };
   }
 }

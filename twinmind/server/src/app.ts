@@ -299,6 +299,10 @@ export function createApp(deps: AppDeps) {
           case "interrupt":
             if (isValidId(msg.conversationId)) chat.interrupt(msg.conversationId);
             return;
+          case "unqueue":
+            if (!isValidId(msg.conversationId) || typeof msg.messageId !== "string" || !chat.unqueue(msg.conversationId, msg.messageId))
+              send({ type: "error", message: "That message was already sent" });
+            return;
           case "subscribe": {
             // Sent on the event socket so the snapshot is ordered with the live events:
             // everything after it is newer, nothing is lost or applied twice.

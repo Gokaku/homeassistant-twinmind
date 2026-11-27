@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.0
+
+- Write while the assistant is working, as in the Claude and Codex apps:
+  - A message sent during a reply goes straight into it: the assistant sees it at its next
+    step (Codex: `turn/steer`; Claude: Claude Code's input stream). Its answer continues
+    below your message.
+  - If it cannot go in (another assistant or mode was picked, or the reply was just ending),
+    it waits as "Sends when the reply is done" and is sent automatically; several waiting
+    messages go out together. The ✕ next to it takes it back.
+  - Stop also drops the waiting messages and puts their text back in the composer.
+  - While a reply runs, the send button stops it when the box is empty and sends when you
+    have typed something.
+
 ## 0.4.1
 
 - Raw Home Assistant commands (the WebSocket/REST escape hatches) are judged by what they do
