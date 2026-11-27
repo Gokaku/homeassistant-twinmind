@@ -47,15 +47,15 @@ backups. Signing out from Twinmind removes them.
 
 ## Permission modes
 
-Pick a mode in the chip next to the microphone. A colored dot shows the risk:
-green = read only, blue = asks first, amber = acts on its own within limits, red = no limits.
+Tap the button next to the microphone (it shows model, thinking level and mode) and pick a
+mode under *Permission mode*; the mode's description is shown below it.
 
 | Claude | What it does |
 | --- | --- |
 | Ask | Asks before edits and commands (default) |
 | Plan | Explores read-only and proposes a plan; you approve the plan |
 | Accept edits | Edits files without asking, still asks for commands |
-| Auto | A safety classifier approves or blocks each action |
+| Auto | A safety classifier approves or blocks each action; HA changes run without asking |
 | Don't ask | Never asks; anything not pre-approved is denied |
 | Bypass | Runs everything without asking |
 
@@ -73,20 +73,23 @@ When an approval card appears you can *Deny*, *Allow* once, or allow *Always* fo
 that conversation.
 
 Changes to Home Assistant itself (renames, services, automations) follow the same idea:
-they run without asking in **Bypass** / **Full access** and in Codex's **Auto** (except raw
+they run without asking in **Bypass** / **Full access** and in **Auto** (except raw
 WebSocket/REST calls, which always ask), are refused in **Plan**, **Read only** and
 **Don't ask**, and show an approval card in every other mode. Twinmind enforces this itself,
 for Claude and Codex alike.
 
 ## Models and thinking
 
-The model button next to the microphone lists the exact models of both assistants. For Codex
-the model Codex itself recommends is preselected until you pick another one, and Twinmind
-always tells Codex exactly which model to use.
+One button next to the microphone shows the model, the thinking level and the mode
+(e.g. "6.1-Sol · XHigh · Auto"). Tapping it opens everything in one place:
 
-For Codex models you also pick the thinking level (*Low*, *Medium*, *High*, *Extra high*, ...,
-whatever the model supports) in the chip next to the model. It starts at the model's own
-default and is remembered on this device.
+- **Model**: the exact models of both assistants, as Claude Code and Codex list them. The one
+  each assistant recommends is marked and preselected until you pick another; Twinmind always
+  sends the exact model with every message. Picking a model of the other assistant switches
+  assistants (the conversation is handed over).
+- **Thinking**: *Low*, *Medium*, *High*, *Extra high*, *Max*, ... whatever the model supports.
+  It starts at the model's default (*High* for Claude) and is remembered on this device.
+- **Permission mode**: see above.
 
 ## Questions, plans and context
 

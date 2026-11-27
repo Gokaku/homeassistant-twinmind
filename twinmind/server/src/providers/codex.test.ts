@@ -2,7 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { findProjectCodexConfig, modelsFromList, pickModel, sandboxPolicyFor, threadConfig } from "./codex.js";
+import { findProjectCodexConfig, modelsFromList, sandboxPolicyFor, threadConfig } from "./codex.js";
+import { pickModel } from "./models.js";
 
 describe("findProjectCodexConfig", () => {
   it("finds a project config in the working directory or a parent", () => {
@@ -53,7 +54,7 @@ describe("threadConfig", () => {
   it("turns off everything that keeps working after the turn ended", () => {
     // Verified with codex 0.166: sub-agents and goals both ran on unattended, with the
     // sandbox of an earlier Full access turn.
-    expect(threadConfig(undefined)).toMatchObject({ features: { multi_agent: false, goals: false } });
+    expect(threadConfig(undefined)).toMatchObject({ features: { multi_agent: false, multi_agent_v2: false, goals: false } });
   });
 });
 

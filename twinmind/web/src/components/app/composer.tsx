@@ -32,11 +32,6 @@ import {
   PromptInputButton,
   PromptInputFooter,
   PromptInputHeader,
-  PromptInputSelect,
-  PromptInputSelectContent,
-  PromptInputSelectItem,
-  PromptInputSelectTrigger,
-  PromptInputSelectValue,
   PromptInputSubmit,
   PromptInputTextarea,
   PromptInputTools,
@@ -62,7 +57,10 @@ import {
   toast,
   useStore,
 } from "@/lib/store";
-import { BrainIcon, CheckIcon, LogInIcon, ShieldAlertIcon } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { BrainIcon, CheckIcon, ChevronDownIcon, LogInIcon, ShieldAlertIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PROVIDER_LOGO } from "./brand";
 
@@ -187,22 +185,7 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
                 }}
               />
             )}
-            <AssistantSelector />
-            <EffortSelector />
-            {info && (
-              <PromptInputSelect value={mode} onValueChange={(v) => setMode(providerId, v)}>
-                <PromptInputSelectTrigger aria-label="Permission mode" className="shrink-0 gap-1 px-2">
-                  <PromptInputSelectValue />
-                </PromptInputSelectTrigger>
-                <PromptInputSelectContent>
-                  {info.modes.map((m) => (
-                    <PromptInputSelectItem key={m.id} value={m.id}>
-                      {m.label}
-                    </PromptInputSelectItem>
-                  ))}
-                </PromptInputSelectContent>
-              </PromptInputSelect>
-            )}
+            <ChatSettings />
             {usage?.contextWindow ? (
               <Context
                 maxTokens={usage.contextWindow}
@@ -249,52 +232,70 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
   );
 }
 
+const EFFORT_SHORT: Record<string, string> = { minimal: "Min", medium: "Med", xhigh: "XHigh" };
+
 /**
- * Who answers and with which model, in one AI Elements ModelSelector grouped by assistant.
+ * Who answers, with which model, how much it thinks, and what it may do: one button in the
+ * composer (room for the text on phones) that opens all of it in one AI Elements ModelSelector.
  * Picking a model of the other assistant switches assistants (the transcript is handed over).
  */
-function AssistantSelector() {
+function ChatSettings() {
   const providers = useStore((s) => s.providers);
   const providerId = useStore((s) => s.provider);
-  const [open, setOpen] = useState(false);
-  const current = providers.find((p) => p.id === providerId);
+  const mode = useStore((s) => currentMode(s));
   // The model a message would go to now: the picked one, or the assistant's default.
   const model = useStore((s) => currentModel(s));
+  const effort = useStore((s) => currentEffort(s));
+  const [open, setOpen] = useState(false);
+  const current = providers.find((p) => p.id === providerId);
   if (!current) return null;
-  // The logo already says which assistant it is: the button names the model.
-  const shortLabel = model?.label ?? "Default";
-  const brandPrefix = /^GPT-(?=.)/i.exec(shortLabel)?.[0] ?? "";
-
-  const select = (p: ProviderId, model: string) => {
-    setProvider(p);
-    setModel(p, model);
-    setOpen(false);
-  };
+  const modelLabel = model?.label ?? "Default";
+  // Every Codex model is "GPT-…" and the logo already says OpenAI: on phones keep the part that differs.
+  const brandPrefix = /^GPT-(?=.)/i.exec(modelLabel)?.[0] ?? "";
+  const effortLabel = model?.efforts?.find((e) => e.id === effort)?.label ?? effort;
+  const modeInfo = current.modes.find((m) => m.id === mode);
+  const summary = [modelLabel, effortLabel && `${effortLabel} thinking`, modeInfo?.label].filter(Boolean).join(", ");
 
   return (
     <ModelSelector open={open} onOpenChange={setOpen}>
       <ModelSelectorTrigger asChild>
-        <PromptInputButton aria-label={`Assistant and model: ${current.label}, ${shortLabel}`} className="min-w-0 shrink gap-1.5 px-2">
+        <PromptInputButton aria-label={`${current.label}: ${summary}`} className="min-w-0 shrink justify-start gap-1.5 px-2">
           <ModelSelectorLogo provider={PROVIDER_LOGO[providerId]} className="shrink-0" />
-          <ModelSelectorName className="max-[374px]:hidden">
-            {/* Every Codex model is "GPT-…" and the logo already says OpenAI: on phones keep the part that differs. */}
+          <ModelSelectorName className="min-w-0 flex-initial">
             {brandPrefix && <span className="max-[479px]:hidden">{brandPrefix}</span>}
-            {shortLabel.slice(brandPrefix.length)}
+            {modelLabel.slice(brandPrefix.length)}
           </ModelSelectorName>
+          {effort && (
+            <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
+              <BrainIcon className="size-3.5" />
+              {EFFORT_SHORT[effort] ?? effortLabel}
+            </span>
+          )}
+          {modeInfo && <span className="shrink-0 text-muted-foreground">· {modeInfo.label}</span>}
+          <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
         </PromptInputButton>
       </ModelSelectorTrigger>
-      <ModelSelectorContent title="Assistant and model">
+      <ModelSelectorContent title="Assistant, model and mode">
         <ModelSelectorInput placeholder="Search models..." />
-        <ModelSelectorList>
+        <ModelSelectorList className="max-h-[min(300px,40dvh)]">
           <ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
-          {providers.map((p) => (
+          {/* The current assistant first, so its models are in view when the list opens. */}
+          {[current, ...providers.filter((p) => p !== current)].map((p) => (
             <ModelSelectorGroup key={p.id} heading={p.auth.state === "signed-in" ? p.label : `${p.label} (not signed in)`}>
               {(p.models.length ? p.models : [{ id: "", label: "Default" }]).map((m) => {
-                const isSelected = p.id === providerId && m.id === model?.id;
+                const isSelected = p.id === providerId && m.id === (model?.id ?? "");
                 return (
-                  <ModelSelectorItem key={`${p.id}:${m.id}`} value={`${p.label} ${m.label} ${m.id}`} onSelect={() => select(p.id, m.id)}>
+                  <ModelSelectorItem
+                    key={`${p.id}:${m.id}`}
+                    value={`${p.label} ${m.label} ${m.id}`}
+                    onSelect={() => {
+                      setProvider(p.id);
+                      setModel(p.id, m.id);
+                    }}
+                  >
                     <ModelSelectorLogo provider={PROVIDER_LOGO[p.id]} />
                     <ModelSelectorName>{m.label}</ModelSelectorName>
+                    {m.isDefault && <span className="text-xs text-muted-foreground">recommended</span>}
                     {isSelected ? <CheckIcon className="ml-auto size-4" /> : <div className="ml-auto size-4" />}
                   </ModelSelectorItem>
                 );
@@ -302,35 +303,48 @@ function AssistantSelector() {
             </ModelSelectorGroup>
           ))}
         </ModelSelectorList>
+        <div className="grid gap-4 border-t p-4">
+          {model?.efforts?.length && effort ? (
+            <div className="grid gap-2">
+              <Label id="tm-effort">Thinking</Label>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                size="sm"
+                spacing={1}
+                aria-labelledby="tm-effort"
+                className="flex w-full flex-wrap"
+                value={effort}
+                onValueChange={(v) => v && setEffort(providerId, v)}
+              >
+                {model.efforts.map((e) => (
+                  <ToggleGroupItem key={e.id} value={e.id} title={e.description} className="flex-1 px-2.5">
+                    {e.label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
+          ) : null}
+          <div className="grid gap-2">
+            <Label htmlFor="tm-mode">Permission mode</Label>
+            <Select value={mode} onValueChange={(v) => setMode(providerId, v)}>
+              <SelectTrigger id="tm-mode" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {current.modes.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {modeInfo && <p className="text-muted-foreground text-xs">{modeInfo.description}</p>}
+          </div>
+          <Button onClick={() => setOpen(false)}>Done</Button>
+        </div>
       </ModelSelectorContent>
     </ModelSelector>
-  );
-}
-
-const EFFORT_SHORT: Record<string, string> = { minimal: "Min", medium: "Med", xhigh: "XHigh" };
-
-/** How much the model thinks, for models that let you choose (Codex). */
-function EffortSelector() {
-  const providerId = useStore((s) => s.provider);
-  const model = useStore((s) => currentModel(s));
-  const effort = useStore((s) => currentEffort(s));
-  if (!model?.efforts?.length || !effort) return null;
-  const label = model.efforts.find((e) => e.id === effort)?.label ?? effort;
-  return (
-    <PromptInputSelect value={effort} onValueChange={(v) => setEffort(providerId, v)}>
-      {/* Short on the button so the model name still fits on phones; full names in the list. */}
-      <PromptInputSelectTrigger aria-label={`Thinking: ${label}`} className="shrink-0 gap-1 px-2 max-[479px]:[&>svg:last-child]:hidden">
-        <BrainIcon className="max-[479px]:hidden" />
-        <PromptInputSelectValue>{EFFORT_SHORT[effort] ?? label}</PromptInputSelectValue>
-      </PromptInputSelectTrigger>
-      <PromptInputSelectContent>
-        {model.efforts.map((e) => (
-          <PromptInputSelectItem key={e.id} value={e.id}>
-            {e.label}
-          </PromptInputSelectItem>
-        ))}
-      </PromptInputSelectContent>
-    </PromptInputSelect>
   );
 }
 
