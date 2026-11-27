@@ -52,6 +52,8 @@ describe("classifyRaw", () => {
     expect(rest("GET", "/config/../hassio/info")).toBe("sensitive");
     expect(rest("GET", "/%2e%2e/hassio")).toBe("sensitive");
     expect(rest("POST", "/AUTH/token")).toBe("sensitive");
+    expect(rest("GET", "//hassio/info")).toBe("sensitive");
+    expect(rest("POST", "/config//auth/x")).toBe("sensitive");
   });
 
   it("remembers \"Always\" per command, not for every raw call", () => {

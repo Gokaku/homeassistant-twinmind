@@ -50,7 +50,8 @@ export function classifyRaw(tool: string, args: any): RawCall | null {
   if (tool === "ha_rest") {
     const method = String(args?.method ?? "").toUpperCase();
     const raw = String(args?.path ?? "");
-    const path = raw.toLowerCase().split("?")[0];
+    // "//hassio/x" reaches /hassio/x too: compare with repeated slashes collapsed.
+    const path = raw.toLowerCase().split("?")[0].replace(/\/{2,}/g, "/");
     const key = `ha_rest ${method} ${raw}`;
     // Anything that could step out of the path it names (../, encoded characters) is sensitive.
     if (/\.\.|%|\\/.test(path) || REST_SENSITIVE.some((p) => path === p || path.startsWith(`${p}/`))) return { kind: "sensitive", key };
