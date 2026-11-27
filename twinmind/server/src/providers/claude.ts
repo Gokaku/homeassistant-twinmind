@@ -222,10 +222,13 @@ export class ClaudeProvider implements Provider {
         new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error("timeout")), 20_000))),
       ]).finally(() => clearTimeout(timer));
       const models = modelsFromSdk(list);
-      if (!models.length) return FALLBACK_MODELS;
+      if (!models.length) throw new Error("empty model list");
       this.modelCache = { at: Date.now(), models };
       return models;
     } catch {
+      // Remember the failure for a minute: every turn asks for the list, and a Claude Code that
+      // does not answer would otherwise delay each reply by the timeout.
+      this.modelCache = { at: Date.now() - 9 * 60_000, models: FALLBACK_MODELS };
       return FALLBACK_MODELS;
     } finally {
       try {

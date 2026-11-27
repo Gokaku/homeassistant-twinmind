@@ -22,7 +22,6 @@ export interface HaTool<S extends z.ZodRawShape = z.ZodRawShape> {
 
 const MAX_RESULT_CHARS = 60_000;
 
-
 function tool<S extends z.ZodRawShape>(t: HaTool<S>): HaTool<S> {
   return t;
 }
