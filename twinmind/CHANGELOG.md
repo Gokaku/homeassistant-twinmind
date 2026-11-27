@@ -2,15 +2,22 @@
 
 ## 0.4.0
 
-- Codex: pick the thinking level (Low, Medium, High, Extra high, ... as the model supports)
-  in a new chip next to the model.
-- Codex: the vague "Default" model is gone; the list shows the real models and preselects
-  the one Codex recommends. The chosen model and thinking level are sent with every message
-  (before, "Default" kept whatever model an earlier message in the chat had used).
+- Model, thinking level and permission mode are in one button in the composer, which opens
+  them all in one dialog: more room on phones.
+- Thinking level (Low, Medium, High, Extra high, Max, ... as the model supports) can be
+  picked for Claude and Codex.
+- The vague "Default" model is gone. Claude's models now come from Claude Code itself (the
+  fixed Opus/Sonnet/Haiku list was missing newer models such as Fable); the one each
+  assistant recommends is marked and preselected. Model and thinking level are sent with
+  every message (before, Codex's "Default" kept whatever model an earlier message had used).
 - Codex: no more double approvals for Home Assistant changes. Codex asked again for every
   HA tool call on top of Twinmind's own decision by mode.
-- Codex **Auto** makes Home Assistant changes without asking, like Full access; only raw
+- **Auto** (Claude and Codex) makes Home Assistant changes without asking; only raw
   WebSocket/REST calls still ask.
+- Security: Claude now gets the Home Assistant tool server's secret over stdin instead of the
+  command line, where any command Claude ran could read it from `/proc`.
+- Updated Claude Agent SDK to 0.3.332 and Codex to 0.172.0. Codex's new sub-agent runtime
+  (`multi_agent_v2`) is switched off like the old one.
 
 ## 0.3.9
 

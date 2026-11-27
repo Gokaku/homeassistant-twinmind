@@ -3,6 +3,8 @@ import {
   listSessions,
   query,
   type CanUseTool,
+  type EffortLevel,
+  type ModelInfo as SdkModelInfo,
   type PermissionMode,
   type PermissionUpdate,
   type SDKMessage,
@@ -17,6 +19,7 @@ import type { AuthState, ChatMessage, ModeInfo, ModelInfo, Part, ToolKind } from
 import { HA_TOOLS } from "../hass/tools.js";
 import { HA_INSTRUCTIONS, HA_MCP_SERVER } from "./instructions.js";
 import { agentEnv } from "./env.js";
+import { effortLabel, pickModel } from "./models.js";
 import { describeTool, stringifyOutput, truncate } from "./tooltext.js";
 import type { NativeSession, Provider, TurnContext } from "./types.js";
 
@@ -48,17 +51,58 @@ const MODES: ModeInfo[] = [
   { id: "default", label: "Ask", description: "Asks before edits and commands", risk: "normal" },
   { id: "plan", label: "Plan", description: "Read-only: explores and proposes a plan", risk: "safe" },
   { id: "acceptEdits", label: "Accept edits", description: "Edits /config without asking (config can run code); asks for commands and HA changes", risk: "elevated" },
-  { id: "auto", label: "Auto", description: "A safety classifier approves or blocks commands and edits; asks for HA changes", risk: "elevated" },
+  { id: "auto", label: "Auto", description: "A safety classifier approves or blocks commands and edits; HA changes run without asking (raw HA API calls ask)", risk: "elevated" },
   { id: "dontAsk", label: "Don't ask", description: "Never asks; denies anything not pre-approved", risk: "safe" },
   { id: "bypassPermissions", label: "Bypass", description: "Runs everything without asking, as root, including HA changes", risk: "danger" },
 ];
 
-const MODELS: ModelInfo[] = [
-  { id: "", label: "Default", description: "Your plan's default model" },
-  { id: "opus", label: "Opus", description: "Most capable" },
-  { id: "sonnet", label: "Sonnet", description: "Fast and capable" },
-  { id: "haiku", label: "Haiku", description: "Fastest" },
-];
+const ALL_EFFORTS = ["low", "medium", "high", "xhigh", "max"];
+
+/** Used only if Claude Code cannot be asked for its model list. */
+const FALLBACK_MODELS: ModelInfo[] = [
+  { id: "opus", label: "Opus", isDefault: true },
+  { id: "sonnet", label: "Sonnet" },
+  { id: "haiku", label: "Haiku" },
+].map((m) => withEfforts(m, ALL_EFFORTS));
+
+function withEfforts(m: ModelInfo, levels: string[]): ModelInfo {
+  if (!levels.length) return m;
+  return {
+    ...m,
+    efforts: levels.map((id) => ({ id, label: effortLabel(id) })),
+    // The API's own default effort.
+    defaultEffort: levels.includes("high") ? "high" : levels[levels.length - 1],
+  };
+}
+
+/**
+ * Twinmind's model list from Claude Code's supportedModels(). Claude Code's "Default" row
+ * stands for one of the real models: that model is marked as the default instead, so the
+ * user always picks (and sees) an exact model.
+ */
+export function modelsFromSdk(list: SdkModelInfo[]): ModelInfo[] {
+  const def = list.find((m) => m.value === "default");
+  const defaultId = def?.resolvedModel;
+  const out: ModelInfo[] = [];
+  const seen = new Set<string>();
+  for (const m of list) {
+    if (m.value === "default") continue;
+    const resolved = m.resolvedModel ?? m.value;
+    if (seen.has(resolved)) continue; // an alias and its full id: list the model once
+    seen.add(resolved);
+    out.push(
+      withEfforts(
+        { id: m.value, label: m.displayName || m.value, description: m.description || undefined, isDefault: !!defaultId && resolved === defaultId },
+        m.supportsEffort ? (m.supportedEffortLevels ?? []) : [],
+      ),
+    );
+  }
+  if (def && defaultId && !seen.has(defaultId)) {
+    out.unshift(withEfforts({ id: defaultId, label: def.description || defaultId, isDefault: true }, def.supportsEffort ? (def.supportedEffortLevels ?? []) : []));
+  }
+  if (out.length && !out.some((m) => m.isDefault)) out[0].isDefault = true;
+  return out;
+}
 
 
 
@@ -152,6 +196,7 @@ export class ClaudeProvider implements Provider {
   readonly defaultMode = "default";
   private login: LoginState | null = null;
   private authCache: { at: number; value: AuthState } | null = null;
+  private modelCache: { at: number; models: ModelInfo[] } | null = null;
 
   constructor(private readonly opts: { cwd: string; bin?: string | null }) {}
 
@@ -160,7 +205,35 @@ export class ClaudeProvider implements Provider {
   }
 
   async models(): Promise<ModelInfo[]> {
-    return MODELS;
+    if (this.modelCache && Date.now() - this.modelCache.at < 10 * 60_000) return this.modelCache.models;
+    // Claude Code answers this without a prompt and without an API call (works signed out).
+    async function* idle(): AsyncIterable<SDKUserMessage> {
+      await new Promise(() => {});
+    }
+    let q: ReturnType<typeof query> | null = null;
+    try {
+      q = query({
+        prompt: idle(),
+        options: { cwd: this.opts.cwd, env: agentEnv(), pathToClaudeCodeExecutable: this.bin ?? undefined, settingSources: [] },
+      });
+      let timer: NodeJS.Timeout | undefined;
+      const list = await Promise.race([
+        q.supportedModels(),
+        new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error("timeout")), 20_000))),
+      ]).finally(() => clearTimeout(timer));
+      const models = modelsFromSdk(list);
+      if (!models.length) return FALLBACK_MODELS;
+      this.modelCache = { at: Date.now(), models };
+      return models;
+    } catch {
+      return FALLBACK_MODELS;
+    } finally {
+      try {
+        q?.close();
+      } catch {
+        /* already closed */
+      }
+    }
   }
 
   async auth(): Promise<AuthState> {
@@ -277,6 +350,7 @@ export class ClaudeProvider implements Provider {
     ctx.signal.addEventListener("abort", onAbort, { once: true });
 
     const mode = ctx.mode as PermissionMode;
+    const { model, effort } = pickModel(await this.models(), ctx.model, ctx.effort);
     const st: StreamState = {
       toolParts: new Map(),
       streamed: new Set(), // assistant message ids we received stream events for
@@ -368,7 +442,8 @@ export class ClaudeProvider implements Provider {
       options: {
         cwd: ctx.cwd,
         resume: ctx.nativeId,
-        model: ctx.model || undefined,
+        model: model ?? undefined,
+        effort: (effort ?? undefined) as EffortLevel | undefined,
         permissionMode: mode,
         thinking: THINKING,
         allowDangerouslySkipPermissions: mode === "bypassPermissions",
@@ -379,6 +454,9 @@ export class ClaudeProvider implements Provider {
         ...(ctx.mcp
           ? {
               mcpServers: { [HA_MCP_SERVER]: { type: "http" as const, url: ctx.mcp.url, headers: { Authorization: `Bearer ${ctx.mcp.secret}` } } },
+              // Over stdin, not the command line: every command Claude runs could read the
+              // bearer secret and this chat's MCP URL from /proc/<pid>/cmdline otherwise.
+              mcpServersDelivery: "initialize" as const,
               allowedTools: [`mcp__${HA_MCP_SERVER}`],
             }
           : {}),

@@ -17,12 +17,13 @@ export function haPolicy(provider: ProviderId, mode: string, tool?: string): HaP
     if (mode === "bypassPermissions") return "allow";
     if (mode === "plan") return "read-only";
     if (mode === "dontAsk") return "deny";
-    return "ask"; // default, acceptEdits, auto
+    // Auto: regular HA changes run unasked; raw WebSocket/REST calls can do anything, so they still ask.
+    if (mode === "auto") return tool && !HA_ALWAYS_ASK.has(tool) ? "allow" : "ask";
+    return "ask"; // default, acceptEdits
   }
   if (provider === "codex") {
     if (mode === "full-access") return "allow";
     if (mode === "read-only") return "read-only";
-    // Auto: regular HA changes run unasked; raw WebSocket/REST calls can do anything, so they still ask.
     if (mode === "auto") return tool && !HA_ALWAYS_ASK.has(tool) ? "allow" : "ask";
     return "ask"; // untrusted
   }

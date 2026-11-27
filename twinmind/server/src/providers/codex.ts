@@ -6,6 +6,7 @@ import { CodexRpc, findCodexBinary, type ServerRequestMsg } from "./codex-rpc.js
 import { HA_TOOLS } from "../hass/tools.js";
 import { HA_INSTRUCTIONS, HA_MCP_SERVER } from "./instructions.js";
 import { agentEnv } from "./env.js";
+import { effortLabel, pickModel } from "./models.js";
 import { stringifyOutput, truncate } from "./tooltext.js";
 import type { NativeSession, Provider, TurnContext } from "./types.js";
 
@@ -51,18 +52,6 @@ const MODES: (ModeInfo & Policy)[] = [
 
 
 
-const EFFORT_LABELS: Record<string, string> = {
-  none: "None",
-  minimal: "Minimal",
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-  xhigh: "Extra high",
-  max: "Max",
-  ultra: "Ultra",
-};
-const effortLabel = (e: string) => EFFORT_LABELS[e] ?? e.charAt(0).toUpperCase() + e.slice(1);
-
 /** Twinmind's model list from Codex's model/list result. Exactly one model is the default. */
 export function modelsFromList(r: any): ModelInfo[] {
   const list: ModelInfo[] = (r?.data ?? [])
@@ -87,18 +76,6 @@ export function modelsFromList(r: any): ModelInfo[] {
     });
   if (list.length && !list.some((m) => m.isDefault)) list[0].isDefault = true;
   return list;
-}
-
-/**
- * The model and thinking level a turn runs with. Both are always sent explicitly: Codex keeps
- * a thread's last model and effort when a turn leaves them out, so "the default" would
- * otherwise silently mean "whatever the previous turn used".
- */
-export function pickModel(models: ModelInfo[], model?: string, effort?: string): { model: string | null; effort: string | null } {
-  const m = models.find((x) => x.id === model) ?? models.find((x) => x.isDefault) ?? models[0];
-  if (!m) return { model: model || null, effort: null };
-  const e = m.efforts?.some((x) => x.id === effort) ? effort! : (m.defaultEffort ?? null);
-  return { model: m.id, effort: e };
 }
 
 interface ActiveTurn {
@@ -154,7 +131,8 @@ export function threadConfig(mcp: { url: string } | undefined): Record<string, u
     //   sub-agent kept writing outside /config during a later Read only turn);
     // - a goal (create_goal) makes Codex start new turns on its own, in a loop, with the last
     //   turn's sandbox (Full access: unsandboxed, without approvals).
-    features: { multi_agent: false, goals: false },
+    // multi_agent_v2 is off by default in codex 0.172 but is the successor of multi_agent.
+    features: { multi_agent: false, multi_agent_v2: false, goals: false },
     ...(mcp
       ? {
           // Twinmind's Home Assistant tools; the bearer secret is read from the app-server's environment.
