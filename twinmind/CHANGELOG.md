@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.1
+
+- Both assistants now always read your project instructions and skills in `/config`:
+  `AGENTS.md` and `CLAUDE.md`, and the skills in `.agents/skills/`, `.claude/skills/` and
+  `.codex/skills/` (each skill a folder with a `SKILL.md`). Claude used to see only
+  `CLAUDE.md`; Codex did not see `CLAUDE.md` or `.claude/skills`. Twinmind passes them as
+  text (Claude Code's project settings, which could also load hooks, stay off).
+
 ## 0.5.0
 
 - Write while the assistant is working, as in the Claude and Codex apps:
