@@ -61,7 +61,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { BrainIcon, CheckIcon, ChevronDownIcon, LogInIcon, ShieldAlertIcon } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { cn } from "@/lib/utils";
 import { PROVIDER_LOGO } from "./brand";
 
 // Browser speech recognition (Chrome, Edge, Safari). Without it the mic could only record
@@ -234,6 +235,90 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
 
 const EFFORT_SHORT: Record<string, string> = { minimal: "Min", medium: "Med", xhigh: "XHigh" };
 
+interface ButtonText {
+  model?: string;
+  effort?: string;
+  mode?: string;
+}
+
+const TRIGGER_CLASS = "justify-start gap-1.5 whitespace-nowrap px-2";
+
+function TriggerText({ text, logo }: { text: ButtonText; logo: ReactNode }) {
+  return (
+    <>
+      {logo}
+      {text.model && <ModelSelectorName className="flex-none">{text.model}</ModelSelectorName>}
+      {text.effort && (
+        <span className="flex items-center gap-1 text-muted-foreground">
+          <BrainIcon className="size-3.5" />
+          {text.effort}
+        </span>
+      )}
+      {text.mode && <span className="text-muted-foreground">· {text.mode}</span>}
+      <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
+    </>
+  );
+}
+
+/**
+ * The composer button for ChatSettings. All variants are rendered invisibly to measure them;
+ * the button shows the first one that fits in the room the other composer tools leave.
+ */
+function FittingTrigger({ variants, logo, ariaLabel }: { variants: ButtonText[]; logo: ReactNode; ariaLabel: string }) {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
+  const [level, setLevel] = useState(0);
+  const key = JSON.stringify(variants);
+
+  useLayoutEffect(() => {
+    const button = buttonRef.current;
+    const tools = button?.parentElement;
+    const measure = measureRef.current;
+    if (!button || !tools || !measure) return;
+    const fit = () => {
+      const style = getComputedStyle(tools);
+      const gap = parseFloat(style.columnGap) || 0;
+      const items = [...tools.children].filter((c) => c !== measure && getComputedStyle(c).position !== "absolute" && getComputedStyle(c).position !== "fixed");
+      const others = items.filter((c) => c !== button).reduce((sum, c) => sum + (c as HTMLElement).offsetWidth, 0);
+      const room = tools.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - others - gap * (items.length - 1);
+      const widths = [...measure.children].map((c) => (c as HTMLElement).getBoundingClientRect().width);
+      const i = widths.findIndex((w) => w <= room + 0.5);
+      setLevel(i < 0 ? widths.length - 1 : i);
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(tools);
+    for (const c of tools.children) if (c !== measure) ro.observe(c);
+    // Tools that appear later (the context ring) change the room as well.
+    const mo = new MutationObserver(() => {
+      for (const c of tools.children) if (c !== measure) ro.observe(c);
+      fit();
+    });
+    mo.observe(tools, { childList: true });
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+    };
+  }, [key]);
+
+  return (
+    <>
+      <ModelSelectorTrigger asChild>
+        <PromptInputButton ref={buttonRef} size="sm" aria-label={ariaLabel} className={cn(TRIGGER_CLASS, "min-w-0 shrink overflow-hidden")}>
+          <TriggerText text={variants[Math.min(level, variants.length - 1)]} logo={logo} />
+        </PromptInputButton>
+      </ModelSelectorTrigger>
+      <div ref={measureRef} aria-hidden className="pointer-events-none invisible fixed top-0 left-0 flex w-max flex-col items-start">
+        {variants.map((v, i) => (
+          <PromptInputButton key={i} size="sm" tabIndex={-1} className={TRIGGER_CLASS}>
+            <TriggerText text={v} logo={logo} />
+          </PromptInputButton>
+        ))}
+      </div>
+    </>
+  );
+}
+
 /**
  * Who answers, with which model, how much it thinks, and what it may do: one button in the
  * composer (room for the text on phones) that opens all of it in one AI Elements ModelSelector.
@@ -256,26 +341,27 @@ function ChatSettings() {
   const modeInfo = current.modes.find((m) => m.id === mode);
   const summary = [modelLabel, effortLabel && `${effortLabel} thinking`, modeInfo?.label].filter(Boolean).join(", ");
 
+  // What the button says, from most to least detailed. The button shows the most detailed one
+  // that fits completely: words are left out, never cut off.
+  const variants: ButtonText[] = [
+    { model: modelLabel, effort: effortLabel, mode: modeInfo?.label },
+    { model: modelLabel, effort: effort && (EFFORT_SHORT[effort] ?? effortLabel), mode: modeInfo?.label },
+    { model: modelLabel.slice(brandPrefix.length), effort: effort && (EFFORT_SHORT[effort] ?? effortLabel), mode: modeInfo?.label },
+    // The mode matters more than the thinking level (it decides what runs without asking).
+    { model: modelLabel.slice(brandPrefix.length), mode: modeInfo?.label },
+    { model: modelLabel.slice(brandPrefix.length), effort: effort && (EFFORT_SHORT[effort] ?? effortLabel) },
+    { model: modelLabel.slice(brandPrefix.length) },
+    {},
+  ];
+
   return (
     <ModelSelector open={open} onOpenChange={setOpen}>
-      <ModelSelectorTrigger asChild>
-        <PromptInputButton aria-label={`${current.label}: ${summary}`} className="min-w-0 shrink justify-start gap-1.5 px-2">
-          <ModelSelectorLogo provider={PROVIDER_LOGO[providerId]} className="shrink-0" />
-          <ModelSelectorName className="min-w-0 flex-initial">
-            {brandPrefix && <span className="max-[479px]:hidden">{brandPrefix}</span>}
-            {modelLabel.slice(brandPrefix.length)}
-          </ModelSelectorName>
-          {effort && (
-            <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
-              <BrainIcon className="size-3.5" />
-              {EFFORT_SHORT[effort] ?? effortLabel}
-            </span>
-          )}
-          {modeInfo && <span className="shrink-0 text-muted-foreground">· {modeInfo.label}</span>}
-          <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
-        </PromptInputButton>
-      </ModelSelectorTrigger>
-      <ModelSelectorContent title="Assistant, model and mode">
+      <FittingTrigger
+        variants={variants}
+        logo={<ModelSelectorLogo provider={PROVIDER_LOGO[providerId]} className="shrink-0" />}
+        ariaLabel={`${current.label}: ${summary}`}
+      />
+      <ModelSelectorContent title="Assistant, model and mode" className="max-h-[calc(100dvh-1rem)] overflow-y-auto">
         <ModelSelectorInput placeholder="Search models..." />
         <ModelSelectorList className="max-h-[min(300px,40dvh)]">
           <ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
@@ -313,12 +399,12 @@ function ChatSettings() {
                 size="sm"
                 spacing={1}
                 aria-labelledby="tm-effort"
-                className="flex w-full flex-wrap"
+                className="grid w-full grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))]"
                 value={effort}
                 onValueChange={(v) => v && setEffort(providerId, v)}
               >
                 {model.efforts.map((e) => (
-                  <ToggleGroupItem key={e.id} value={e.id} title={e.description} className="flex-1 px-2.5">
+                  <ToggleGroupItem key={e.id} value={e.id} title={e.description} className="w-full px-2.5">
                     {e.label}
                   </ToggleGroupItem>
                 ))}
