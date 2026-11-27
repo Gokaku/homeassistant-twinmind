@@ -88,7 +88,7 @@ export async function startMcpEndpoint(opts: { ha: HassClient | null; gate: Tool
         async (args: any) => {
           try {
             if (!opts.ha) throw new Error("The Home Assistant API is not available (no Supervisor token).");
-            if (!t.readOnly) {
+            if (!t.readOnly && !t.readOnlyCall?.(args)) {
               const d = await session.decide(t, args, t.summary(args), gone.signal);
               if (!d.ok) return { content: [{ type: "text" as const, text: d.reason }], isError: true };
               if (gone.signal.aborted) throw new Error("The request was cancelled.");
