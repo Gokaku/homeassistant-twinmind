@@ -32,6 +32,12 @@ export interface ApprovalRequest {
   signal?: AbortSignal;
 }
 
+/** A message the user sent while the turn was running. */
+export interface SteerInput {
+  text: string;
+  attachments: StoredUpload[];
+}
+
 export interface TurnContext {
   prompt: string;
   attachments: StoredUpload[];
@@ -49,6 +55,12 @@ export interface TurnContext {
   requestApproval(req: ApprovalRequest): Promise<ApprovalDecision>;
   /** Ask the user questions; resolves with their answers, or null if dismissed/aborted. */
   requestInput(req: { partId: string; questions: Question[]; signal?: AbortSignal }): Promise<Record<string, string[]> | null>;
+  /**
+   * Providers that can take more user input while the turn runs register how. The function
+   * resolves true once the provider has accepted the message into this turn; false (or no
+   * function) and Twinmind queues it for the next turn instead.
+   */
+  setSteer?(fn: (input: SteerInput) => Promise<boolean>): void;
 }
 
 export interface NativeSession {

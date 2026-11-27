@@ -42,7 +42,8 @@ const providers: Provider[] = [
   new ClaudeProvider({ cwd: config.workDir }),
   new CodexProvider({ cwd: config.workDir }),
 ];
-if (config.enableMock) providers.push(new MockProvider());
+// TWINMIND_MOCK_DELAY_MS slows the fake assistant down, e.g. to try things while it replies.
+if (config.enableMock) providers.push(new MockProvider(Number(process.env.TWINMIND_MOCK_DELAY_MS) || undefined));
 
 const { server, chat, shutdown } = createApp({ config, guard, store, uploads, providers });
 

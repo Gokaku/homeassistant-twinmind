@@ -96,6 +96,15 @@ One button next to the microphone shows the model, the thinking level and the mo
   It starts at the model's default (*High* for Claude) and is remembered on this device.
 - **Permission mode**: see above.
 
+## Writing while the assistant works
+
+You can keep typing while a reply runs. What you send goes straight into the running reply
+(the assistant sees it at its next step, as in the Claude and Codex apps), and its answer
+continues below your message. If that is not possible, for example because you switched
+assistant or mode in between, the message waits ("Sends when the reply is done") and is sent
+as soon as the reply ends; tap ✕ to take it back. *Stop* ends the reply and puts waiting
+messages back into the composer.
+
 ## Questions, plans and context
 
 - When an assistant needs a decision, it asks in the chat with options to tap (or your own

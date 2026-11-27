@@ -227,6 +227,9 @@ function handle(e: ServerEvent) {
         return { ...c, messages: exists ? c.messages.map((m) => (m.id === e.message.id ? e.message : m)) : [...c.messages, e.message] };
       });
       break;
+    case "message.removed":
+      patchConversation(e.conversationId, (c) => ({ ...c, messages: c.messages.filter((m) => m.id !== e.messageId) }));
+      break;
     case "part":
       patchMessage(e.conversationId, e.messageId, (m) => upsertPart(m, e.part));
       break;
@@ -394,6 +397,11 @@ export function answerQuestion(questionPartId: string, answers: Record<string, s
 
 export function interrupt(conversationId: string) {
   send({ type: "interrupt", conversationId });
+}
+
+/** Take back a message that is waiting for the running reply to end. */
+export function unqueue(conversationId: string, messageId: string) {
+  if (!send({ type: "unqueue", conversationId, messageId })) toast("Not connected. Reconnecting…");
 }
 
 export async function deleteConversation(id: string) {

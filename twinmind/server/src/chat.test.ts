@@ -36,13 +36,14 @@ const tokenOf = (ctx: TurnContext) => ctx.mcp!.url.split("/").pop()!;
 
 let dir = "";
 let chat: ChatService;
+let store: ConversationStore;
 const provider = new ScriptedProvider();
 const events: ServerEvent[] = [];
 const ended = new Map<string, () => void>();
 
 beforeAll(async () => {
   dir = await fs.mkdtemp(path.join(os.tmpdir(), "twinmind-chat-"));
-  const store = new ConversationStore(dir);
+  store = new ConversationStore(dir);
   const uploads = new UploadStore(dir, 1024);
   await store.init();
   await uploads.init();
@@ -137,5 +138,119 @@ describe("Home Assistant approval gate", () => {
     );
     answer.stop();
     expect(result).toBe(false);
+  });
+});
+
+describe("messages sent while a reply is running", () => {
+  const until = async (cond: () => boolean) => {
+    for (let i = 0; i < 400 && !cond(); i++) await new Promise((r) => setTimeout(r, 5));
+    expect(cond()).toBe(true);
+  };
+  const send = (text: string, conversationId?: string) =>
+    chat.send({ type: "send", clientRequestId: "r", provider: "mock", mode: "ask", text, conversationId });
+  /** Starts a turn that runs until release() is called; returns its conversation id. */
+  async function startBlocked(onCtx: (ctx: TurnContext) => void = () => {}) {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const prompts: string[] = [];
+    provider.script = async (ctx) => {
+      prompts.push(ctx.prompt);
+      ctx.emit({ type: "native-id", id: "native-1" });
+      onCtx(ctx);
+      if (prompts.length === 1) await gate;
+    };
+    const before = events.length;
+    await send("first");
+    const cid = (events.slice(before).find((e) => e.type === "conversation") as any).meta.id as string;
+    await until(() => prompts.length === 1);
+    return { cid, release, prompts };
+  }
+  const messages = (cid: string) => store.get(cid)!.messages;
+  const textOf = (m: any) => m.parts.find((p: any) => p.type === "text")?.text;
+
+  it("queues a message and sends it when the reply ends", async () => {
+    const { cid, release, prompts } = await startBlocked();
+    await send("second", cid);
+    expect(messages(cid).map((m) => [m.role, textOf(m) ?? "", !!m.queued])).toEqual([
+      ["user", "first", false],
+      ["assistant", "", false],
+      ["user", "second", true],
+    ]);
+    release();
+    await until(() => prompts.length === 2 && !chat.isRunning(cid));
+    expect(prompts[1]).toBe("second");
+    expect(messages(cid).map((m) => [m.role, !!m.queued])).toEqual([
+      ["user", false],
+      ["assistant", false],
+      ["user", false],
+      ["assistant", false],
+    ]);
+    expect(messages(cid).at(-1)!.status).toBe("completed");
+  });
+
+  it("sends several queued messages together, as one turn", async () => {
+    const { cid, release, prompts } = await startBlocked();
+    await send("second", cid);
+    await send("third", cid);
+    release();
+    await until(() => prompts.length === 2 && !chat.isRunning(cid));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(prompts).toEqual(["first", "second\n\nthird"]);
+    expect(messages(cid).map((m) => m.role)).toEqual(["user", "assistant", "user", "user", "assistant"]);
+  });
+
+  it("steers a message into the running reply; later output goes below it", async () => {
+    const steered: string[] = [];
+    let ctxRef!: TurnContext;
+    const { cid, release } = await startBlocked((ctx) => {
+      ctxRef = ctx;
+      ctx.setSteer?.(async ({ text }) => (steered.push(text), true));
+      ctx.emit({ type: "part", part: { type: "text", id: "t1", text: "before" } });
+    });
+    await send("steer me", cid);
+    expect(steered).toEqual(["steer me"]);
+    ctxRef.emit({ type: "part", part: { type: "text", id: "t2", text: "after" } });
+    // A part from before the steered message is still updated in place.
+    ctxRef.emit({ type: "part", part: { type: "text", id: "t1", text: "before, updated" } });
+    release();
+    await until(() => !chat.isRunning(cid));
+    expect(messages(cid).map((m) => [m.role, m.parts.map((p: any) => p.text ?? "").join("|"), m.queued ?? false, m.status ?? ""])).toEqual([
+      ["user", "first", false, ""],
+      ["assistant", "before, updated", false, "completed"],
+      ["user", "steer me", false, ""],
+      ["assistant", "after", false, "completed"],
+    ]);
+  });
+
+  it("drops the part of a reply that a steered message split off before anything was said", async () => {
+    const { cid, release } = await startBlocked((ctx) => ctx.setSteer?.(async () => true));
+    await send("right away", cid);
+    release();
+    await until(() => !chat.isRunning(cid));
+    expect(messages(cid).map((m) => m.role)).toEqual(["user", "user", "assistant"]);
+  });
+
+  it("queues instead when the provider does not take the message", async () => {
+    const { cid, release, prompts } = await startBlocked((ctx) => ctx.setSteer?.(async () => false));
+    await send("second", cid);
+    expect(messages(cid).at(-1)!.queued).toBe(true);
+    release();
+    await until(() => prompts.length === 2);
+  });
+
+  it("drops queued messages when the reply is stopped, and can unqueue one", async () => {
+    const { cid, release } = await startBlocked();
+    await send("second", cid);
+    await send("third", cid);
+    const third = messages(cid).at(-1)!;
+    expect(chat.unqueue(cid, third.id)).toBe(true);
+    expect(chat.unqueue(cid, third.id)).toBe(false);
+    expect(messages(cid).some((m) => m.id === third.id)).toBe(false);
+    const before = events.length;
+    chat.interrupt(cid);
+    release();
+    await until(() => !chat.isRunning(cid));
+    expect(messages(cid).map((m) => m.role)).toEqual(["user", "assistant"]);
+    expect(events.slice(before).some((e) => e.type === "message.removed")).toBe(true);
   });
 });
