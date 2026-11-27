@@ -93,7 +93,7 @@ export class ChatService implements ToolGate {
     // still running: a request that outlived its turn must not run with that turn's mode
     // (or put an approval card on a reply that has already ended).
     if (this.running.get(cid) !== turn) return { ok: false, reason: "This reply has already ended." };
-    const policy = haPolicy(turn.provider, turn.mode);
+    const policy = haPolicy(turn.provider, turn.mode, tool.name);
     if (policy === "allow") return { ok: true };
     if (policy === "read-only")
       return { ok: false, reason: `This chat is in a read-only mode (${turn.mode}). Describe the change instead; the user can switch modes to apply it.` };
@@ -153,6 +153,7 @@ export class ChatService implements ToolGate {
     const attachmentIds = Array.isArray(msg.attachments) ? msg.attachments.slice(0, 10) : [];
     if (!text.trim() && attachmentIds.length === 0) throw new Error("Message is empty");
     const model = typeof msg.model === "string" && msg.model.length < 100 ? msg.model : undefined;
+    const effort = typeof msg.effort === "string" && /^[a-z0-9_-]{1,32}$/i.test(msg.effort) ? msg.effort : undefined;
 
     const attachments: StoredUpload[] = [];
     for (const id of attachmentIds) {
@@ -178,6 +179,7 @@ export class ChatService implements ToolGate {
       role: "user",
       provider: msg.provider,
       model,
+      effort,
       mode: msg.mode,
       createdAt: Date.now(),
       parts: [
@@ -200,6 +202,7 @@ export class ChatService implements ToolGate {
       role: "assistant",
       provider: msg.provider,
       model,
+      effort,
       mode: msg.mode,
       createdAt: Date.now(),
       parts: [],
@@ -218,7 +221,7 @@ export class ChatService implements ToolGate {
     await this.store.save(conv).catch((e) => console.warn(`[twinmind] could not save conversation ${conv.id}: ${e?.message ?? e}`));
 
     const prompt = buildPrompt(conv, history, msg.provider, text || "(see attached files)");
-    void this.runTurn(conv, provider, assistant, prompt, attachments, msg.mode, model, controller);
+    void this.runTurn(conv, provider, assistant, prompt, attachments, msg.mode, model, effort, controller);
   }
 
   private async runTurn(
@@ -229,6 +232,7 @@ export class ChatService implements ToolGate {
     attachments: StoredUpload[],
     mode: string,
     model: string | undefined,
+    effort: string | undefined,
     controller: AbortController,
   ): Promise<void> {
     const cid = conv.id;
@@ -361,6 +365,7 @@ export class ChatService implements ToolGate {
         attachments,
         mode,
         model,
+        effort,
         cwd: this.cwd,
         nativeId: conv.native[pid],
         mcp: this.mcp ? { url: this.mcp.url(this.mcpToken(cid)), secret: this.mcp.secret } : undefined,

@@ -49,8 +49,20 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
 import type { ProviderId } from "@/lib/protocol";
-import { currentMode, interrupt, sendMessage, setMode, setModel, setProvider, toast, useStore } from "@/lib/store";
-import { CheckIcon, LogInIcon, ShieldAlertIcon } from "lucide-react";
+import {
+  currentEffort,
+  currentMode,
+  currentModel,
+  interrupt,
+  sendMessage,
+  setEffort,
+  setMode,
+  setModel,
+  setProvider,
+  toast,
+  useStore,
+} from "@/lib/store";
+import { BrainIcon, CheckIcon, LogInIcon, ShieldAlertIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PROVIDER_LOGO } from "./brand";
 
@@ -176,6 +188,7 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
               />
             )}
             <AssistantSelector />
+            <EffortSelector />
             {info && (
               <PromptInputSelect value={mode} onValueChange={(v) => setMode(providerId, v)}>
                 <PromptInputSelectTrigger aria-label="Permission mode" className="shrink-0 gap-1 px-2">
@@ -243,14 +256,14 @@ export function Composer({ onOpenAccounts, suggestion }: { onOpenAccounts: () =>
 function AssistantSelector() {
   const providers = useStore((s) => s.providers);
   const providerId = useStore((s) => s.provider);
-  const models = useStore((s) => s.models);
   const [open, setOpen] = useState(false);
   const current = providers.find((p) => p.id === providerId);
+  // The model a message would go to now: the picked one, or the assistant's default.
+  const model = useStore((s) => currentModel(s));
   if (!current) return null;
-  const selectedModel = models[providerId] ?? "";
-  const model = current.models.find((m) => m.id === selectedModel);
   // The logo already says which assistant it is: the button names the model.
   const shortLabel = model?.label ?? "Default";
+  const brandPrefix = /^GPT-(?=.)/i.exec(shortLabel)?.[0] ?? "";
 
   const select = (p: ProviderId, model: string) => {
     setProvider(p);
@@ -263,7 +276,11 @@ function AssistantSelector() {
       <ModelSelectorTrigger asChild>
         <PromptInputButton aria-label={`Assistant and model: ${current.label}, ${shortLabel}`} className="min-w-0 shrink gap-1.5 px-2">
           <ModelSelectorLogo provider={PROVIDER_LOGO[providerId]} className="shrink-0" />
-          <ModelSelectorName className="max-[374px]:hidden">{shortLabel}</ModelSelectorName>
+          <ModelSelectorName className="max-[374px]:hidden">
+            {/* Every Codex model is "GPT-…" and the logo already says OpenAI: on phones keep the part that differs. */}
+            {brandPrefix && <span className="max-[479px]:hidden">{brandPrefix}</span>}
+            {shortLabel.slice(brandPrefix.length)}
+          </ModelSelectorName>
         </PromptInputButton>
       </ModelSelectorTrigger>
       <ModelSelectorContent title="Assistant and model">
@@ -273,12 +290,12 @@ function AssistantSelector() {
           {providers.map((p) => (
             <ModelSelectorGroup key={p.id} heading={p.auth.state === "signed-in" ? p.label : `${p.label} (not signed in)`}>
               {(p.models.length ? p.models : [{ id: "", label: "Default" }]).map((m) => {
-                const selected = p.id === providerId && (models[p.id] ?? "") === m.id;
+                const isSelected = p.id === providerId && m.id === model?.id;
                 return (
                   <ModelSelectorItem key={`${p.id}:${m.id}`} value={`${p.label} ${m.label} ${m.id}`} onSelect={() => select(p.id, m.id)}>
                     <ModelSelectorLogo provider={PROVIDER_LOGO[p.id]} />
                     <ModelSelectorName>{m.label}</ModelSelectorName>
-                    {selected ? <CheckIcon className="ml-auto size-4" /> : <div className="ml-auto size-4" />}
+                    {isSelected ? <CheckIcon className="ml-auto size-4" /> : <div className="ml-auto size-4" />}
                   </ModelSelectorItem>
                 );
               })}
@@ -287,6 +304,33 @@ function AssistantSelector() {
         </ModelSelectorList>
       </ModelSelectorContent>
     </ModelSelector>
+  );
+}
+
+const EFFORT_SHORT: Record<string, string> = { minimal: "Min", medium: "Med", xhigh: "XHigh" };
+
+/** How much the model thinks, for models that let you choose (Codex). */
+function EffortSelector() {
+  const providerId = useStore((s) => s.provider);
+  const model = useStore((s) => currentModel(s));
+  const effort = useStore((s) => currentEffort(s));
+  if (!model?.efforts?.length || !effort) return null;
+  const label = model.efforts.find((e) => e.id === effort)?.label ?? effort;
+  return (
+    <PromptInputSelect value={effort} onValueChange={(v) => setEffort(providerId, v)}>
+      {/* Short on the button so the model name still fits on phones; full names in the list. */}
+      <PromptInputSelectTrigger aria-label={`Thinking: ${label}`} className="shrink-0 gap-1 px-2 max-[479px]:[&>svg:last-child]:hidden">
+        <BrainIcon className="max-[479px]:hidden" />
+        <PromptInputSelectValue>{EFFORT_SHORT[effort] ?? label}</PromptInputSelectValue>
+      </PromptInputSelectTrigger>
+      <PromptInputSelectContent>
+        {model.efforts.map((e) => (
+          <PromptInputSelectItem key={e.id} value={e.id}>
+            {e.label}
+          </PromptInputSelectItem>
+        ))}
+      </PromptInputSelectContent>
+    </PromptInputSelect>
   );
 }
 

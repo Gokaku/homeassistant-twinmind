@@ -89,6 +89,7 @@ export interface ChatMessage {
   /** For assistant messages: which provider wrote it. For user messages: who it was sent to. */
   provider: ProviderId;
   model?: string;
+  effort?: string;
   mode?: string;
   parts: Part[];
   createdAt: number;
@@ -124,10 +125,20 @@ export interface ModeInfo {
   /** "safe" = read-only, "normal" = asks, "elevated" = auto edits, "danger" = no questions asked. */
   risk: "safe" | "normal" | "elevated" | "danger";
 }
+export interface EffortInfo {
+  id: string;
+  label: string;
+  description?: string;
+}
 export interface ModelInfo {
   id: string;
   label: string;
   description?: string;
+  /** The model the assistant uses unless another one is picked (preselected in the UI). */
+  isDefault?: boolean;
+  /** Thinking levels this model supports; absent if it cannot be chosen. */
+  efforts?: EffortInfo[];
+  defaultEffort?: string;
 }
 
 export type AuthState =
@@ -164,6 +175,8 @@ export type ClientMessage =
       provider: ProviderId;
       mode: string;
       model?: string;
+      /** Thinking level (one of the model's efforts). */
+      effort?: string;
       text: string;
       attachments?: string[];
     }

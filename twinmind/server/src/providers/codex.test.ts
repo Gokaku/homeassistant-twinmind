@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { findProjectCodexConfig, sandboxPolicyFor, threadConfig } from "./codex.js";
+import { findProjectCodexConfig, modelsFromList, pickModel, sandboxPolicyFor, threadConfig } from "./codex.js";
 
 describe("findProjectCodexConfig", () => {
   it("finds a project config in the working directory or a parent", () => {
@@ -42,9 +42,53 @@ describe("threadConfig", () => {
     });
   });
 
+  it("lets Twinmind, not Codex, decide about HA tool calls", () => {
+    // Verified with codex 0.166: without it every non-read-only HA tool raised an extra
+    // MCP approval request from Codex, on top of Twinmind's own approval by mode.
+    expect(threadConfig({ url: "http://127.0.0.1:1/mcp/token" })).toMatchObject({
+      mcp_servers: { homeassistant: { default_tools_approval_mode: "approve" } },
+    });
+  });
+
   it("turns off everything that keeps working after the turn ended", () => {
     // Verified with codex 0.166: sub-agents and goals both ran on unattended, with the
     // sandbox of an earlier Full access turn.
     expect(threadConfig(undefined)).toMatchObject({ features: { multi_agent: false, goals: false } });
+  });
+});
+
+describe("models and thinking levels", () => {
+  const list = modelsFromList({
+    data: [
+      { id: "a", model: "gpt-a", displayName: "GPT A", hidden: false, isDefault: false, defaultReasoningEffort: "medium", supportedReasoningEfforts: [{ reasoningEffort: "low", description: "Fast" }, { reasoningEffort: "medium" }, { reasoningEffort: "xhigh" }] },
+      { id: "b", model: "gpt-b", displayName: "GPT B", hidden: false, isDefault: true, defaultReasoningEffort: "low", supportedReasoningEfforts: [{ reasoningEffort: "low" }, { reasoningEffort: "high" }] },
+      { id: "c", model: "gpt-c", displayName: "Hidden", hidden: true, isDefault: false, supportedReasoningEfforts: [] },
+    ],
+  });
+
+  it("lists the real models, no vague Default entry, with their thinking levels", () => {
+    expect(list.map((m) => m.id)).toEqual(["gpt-a", "gpt-b"]);
+    expect(list.find((m) => m.isDefault)?.id).toBe("gpt-b");
+    expect(list[0].efforts).toEqual([
+      { id: "low", label: "Low", description: "Fast" },
+      { id: "medium", label: "Medium", description: undefined },
+      { id: "xhigh", label: "Extra high", description: undefined },
+    ]);
+    expect(list[0].defaultEffort).toBe("medium");
+  });
+
+  it("marks the first model as default when Codex names none", () => {
+    expect(modelsFromList({ data: [{ id: "x", model: "x", supportedReasoningEfforts: [] }] })[0]).toMatchObject({ isDefault: true, efforts: undefined });
+  });
+
+  it("always picks an explicit model and effort", () => {
+    expect(pickModel(list, "gpt-a", "xhigh")).toEqual({ model: "gpt-a", effort: "xhigh" });
+    // An effort the model does not support falls back to that model's default.
+    expect(pickModel(list, "gpt-a", "high")).toEqual({ model: "gpt-a", effort: "medium" });
+    // No or an unknown model: Codex's default model with its default effort.
+    expect(pickModel(list, undefined, undefined)).toEqual({ model: "gpt-b", effort: "low" });
+    expect(pickModel(list, "gone", "high")).toEqual({ model: "gpt-b", effort: "high" });
+    // Without a model list (e.g. while signed out) nothing is invented.
+    expect(pickModel([], "gpt-a", "high")).toEqual({ model: "gpt-a", effort: null });
   });
 });
