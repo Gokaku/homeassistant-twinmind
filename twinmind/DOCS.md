@@ -107,6 +107,11 @@ and Codex read them in every chat:
   `description` in the front matter. The assistants see the list and read a skill when a
   task matches it. `.claude/skills/` and `.codex/skills/` work too.
 
+**Memory:** ask either assistant to remember something ("remember that the office is upstairs")
+and it adds a short dated note under `## Memory` in `/config/AGENTS.md`; it also notes lasting
+preferences it learns. The other assistant and every later chat read it. You can edit or
+delete the notes there yourself.
+
 They are part of `/config`, so Home Assistant backups include them. Assistants that may edit
 `/config` without asking can also change these files.
 
