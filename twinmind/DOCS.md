@@ -96,6 +96,20 @@ One button next to the microphone shows the model, the thinking level and the mo
   It starts at the model's default (*High* for Claude) and is remembered on this device.
 - **Permission mode**: see above.
 
+## Project instructions and skills
+
+Keep instructions and skills for the assistants in your configuration folder; both Claude
+and Codex read them in every chat:
+
+- `/config/AGENTS.md` (and/or `/config/CLAUDE.md`): standing instructions, e.g. your naming
+  rules or which dashboard theme you use.
+- `/config/.agents/skills/<name>/SKILL.md`: one folder per skill, with `name` and
+  `description` in the front matter. The assistants see the list and read a skill when a
+  task matches it. `.claude/skills/` and `.codex/skills/` work too.
+
+They are part of `/config`, so Home Assistant backups include them. Assistants that may edit
+`/config` without asking can also change these files.
+
 ## Writing while the assistant works
 
 You can keep typing while a reply runs. What you send goes straight into the running reply

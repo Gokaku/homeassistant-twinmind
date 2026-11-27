@@ -20,6 +20,7 @@ import { HA_TOOLS } from "../hass/tools.js";
 import { HA_INSTRUCTIONS, HA_MCP_SERVER } from "./instructions.js";
 import { agentEnv } from "./env.js";
 import { effortLabel, pickModel } from "./models.js";
+import { projectContext } from "./project.js";
 import { describeTool, stringifyOutput, truncate } from "./tooltext.js";
 import type { NativeSession, Provider, TurnContext } from "./types.js";
 import type { StoredUpload } from "../uploads.js";
@@ -188,15 +189,6 @@ function userMessage(prompt: string, attachments: StoredUpload[], uuid: string):
   };
 }
 
-/** CLAUDE.md in /config, passed as plain text (settings files are not loaded). */
-function projectNotes(cwd: string): string {
-  try {
-    const text = fs.readFileSync(path.join(cwd, "CLAUDE.md"), "utf8").slice(0, 20_000);
-    return text.trim() ? `\n\n<project_notes source="/config/CLAUDE.md">\n${text}\n</project_notes>` : "";
-  } catch {
-    return "";
-  }
-}
 
 interface StreamState {
   /** Usage of the current API message (from message_start / message_delta). */
@@ -496,7 +488,7 @@ export class ClaudeProvider implements Provider {
         // No settings files: an assistant that may edit /config without asking could otherwise
         // write itself permission rules or hooks in /config/.claude and use them next turn.
         settingSources: [],
-        systemPrompt: { type: "preset", preset: "claude_code", append: HA_INSTRUCTIONS + projectNotes(ctx.cwd) },
+        systemPrompt: { type: "preset", preset: "claude_code", append: HA_INSTRUCTIONS + projectContext(ctx.cwd) },
         stderr: (d) => process.env.TWINMIND_DEBUG && process.stderr.write(`[claude] ${d}`),
       },
     });

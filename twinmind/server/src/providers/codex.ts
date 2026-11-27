@@ -7,6 +7,7 @@ import { HA_TOOLS } from "../hass/tools.js";
 import { HA_INSTRUCTIONS, HA_MCP_SERVER } from "./instructions.js";
 import { agentEnv } from "./env.js";
 import { effortLabel, pickModel } from "./models.js";
+import { CODEX_NATIVE, projectContext } from "./project.js";
 import { stringifyOutput, truncate } from "./tooltext.js";
 import type { NativeSession, Provider, TurnContext } from "./types.js";
 import type { StoredUpload } from "../uploads.js";
@@ -253,7 +254,8 @@ export class CodexProvider implements Provider {
       approvalPolicy: policy.approvalPolicy,
       sandbox: policy.sandbox,
       model,
-      developerInstructions: HA_INSTRUCTIONS,
+      // AGENTS.md and the .agents/.codex skills Codex reads itself; CLAUDE.md and .claude/skills not.
+      developerInstructions: HA_INSTRUCTIONS + projectContext(ctx.cwd, CODEX_NATIVE),
       // Home Assistant tools, and the MCP secret kept out of the commands Codex runs.
       config: threadConfig(ctx.mcp),
     };
