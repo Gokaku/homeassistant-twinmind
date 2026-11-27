@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1
+
+- No more approval cards for raw Home Assistant commands that only read: known read-only
+  WebSocket commands (e.g. `config_entries/get`, `lovelace/config`,
+  `lovelace/dashboards/list`, the registry lists) and REST `GET` requests run without asking,
+  in every mode. Raw commands that change something still ask every time, as do reads that
+  can return secrets (e.g. `application_credentials/list`).
+
 ## 0.4.0
 
 - Model, thinking level and permission mode are in one button in the composer, which opens

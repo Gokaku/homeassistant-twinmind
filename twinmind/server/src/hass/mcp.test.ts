@@ -170,6 +170,30 @@ describe("Home Assistant MCP endpoint", () => {
     await c.close();
   });
 
+  it("runs raw read-only WebSocket commands and REST GETs without asking, but asks for raw writes", async () => {
+    const c = await connect();
+    asked.length = 0;
+    nextDecision = { ok: false, reason: "The user declined." };
+    const states = await c.callTool({ name: "ha_websocket", arguments: { type: "get_states" } });
+    expect(text(states)).toContain("light.kitchen");
+    await c.callTool({ name: "ha_websocket", arguments: { type: "config/entity_registry/list" } });
+    await c.callTool({ name: "ha_rest", arguments: { method: "GET", path: "/config/automation/config/1700" } });
+    expect(asked).toEqual([]);
+    const w: any = await c.callTool({ name: "ha_websocket", arguments: { type: "config/area_registry/create", payload: { name: "Attic" } } });
+    expect(w.isError).toBe(true);
+    // Reads that can return secrets are not on the list: they still ask.
+    await c.callTool({ name: "ha_websocket", arguments: { type: "application_credentials/list" } });
+    const p: any = await c.callTool({ name: "ha_rest", arguments: { method: "POST", path: "/services/light/turn_on", body: {} } });
+    expect(p.isError).toBe(true);
+    expect(asked).toEqual([
+      "ha_websocket: config/area_registry/create",
+      "ha_websocket: application_credentials/list",
+      "ha_rest: POST /services/light/turn_on",
+    ]);
+    nextDecision = { ok: true };
+    await c.close();
+  });
+
   it("rejects invalid service names", async () => {
     const c = await connect();
     const r: any = await c.callTool({ name: "ha_call_service", arguments: { domain: "light/../x", service: "on" } });

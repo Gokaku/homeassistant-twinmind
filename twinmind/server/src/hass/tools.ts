@@ -3,14 +3,16 @@ import type { HassClient } from "./client.js";
 
 /**
  * Home Assistant tools offered to both assistants (over MCP).
- * `readOnly` tools never need approval; every other tool goes through
- * Twinmind's approval policy before it runs.
+ * `readOnly` tools never need approval, nor do calls for which `readOnlyCall` says they only
+ * read; everything else goes through Twinmind's approval policy before it runs.
  */
 export interface HaTool<S extends z.ZodRawShape = z.ZodRawShape> {
   name: string;
   title: string;
   description: string;
   readOnly: boolean;
+  /** For tools that can read or write: true if this particular call only reads (no approval). */
+  readOnlyCall?(args: z.infer<z.ZodObject<S>>): boolean;
   input: S;
   /** One line shown on the approval card, e.g. "light.turn_on → light.kitchen". */
   summary(args: z.infer<z.ZodObject<S>>): string;
@@ -18,6 +20,60 @@ export interface HaTool<S extends z.ZodRawShape = z.ZodRawShape> {
 }
 
 const MAX_RESULT_CHARS = 60_000;
+
+/**
+ * Raw WebSocket commands that only read and return nothing secret: they run without approval.
+ * An explicit list, not a pattern: some reads return secrets (application_credentials/list
+ * returns OAuth client secrets), and a name says nothing certain about side effects.
+ */
+export const HA_WS_READ_COMMANDS = new Set([
+  "get_states",
+  "get_config",
+  "get_services",
+  "get_panels",
+  "config/entity_registry/list",
+  "config/entity_registry/list_for_display",
+  "config/entity_registry/get",
+  "config/entity_registry/get_entries",
+  "config/device_registry/list",
+  "config/area_registry/list",
+  "config/floor_registry/list",
+  "config/label_registry/list",
+  "config/category_registry/list",
+  "config_entries/get",
+  "config_entries/get_single",
+  "config_entries/subentries/list",
+  "config_entries/flow/progress",
+  "lovelace/config",
+  "lovelace/dashboards/list",
+  "lovelace/resources",
+  "lovelace/info",
+  "manifest/list",
+  "manifest/get",
+  "integration/descriptions",
+  "repairs/list_issues",
+  "search/related",
+  "backup/info",
+  "energy/get_prefs",
+  "recorder/info",
+  "logger/log_info",
+  "person/list",
+  "zone/list",
+  "tag/list",
+  "input_boolean/list",
+  "input_button/list",
+  "input_datetime/list",
+  "input_number/list",
+  "input_select/list",
+  "input_text/list",
+  "counter/list",
+  "timer/list",
+  "schedule/list",
+  "trace/list",
+  "trace/get",
+  "automation/config",
+  "script/config",
+]);
 
 function tool<S extends z.ZodRawShape>(t: HaTool<S>): HaTool<S> {
   return t;
@@ -465,8 +521,9 @@ export const HA_TOOLS: HaTool<any>[] = [
     name: "ha_websocket",
     title: "Raw WebSocket command",
     description:
-      "Admin escape hatch: send any Home Assistant WebSocket API command (e.g. 'config/label_registry/create', 'config/floor_registry/list', 'backup/info'). Prefer the specific tools when they fit.",
+      "Admin escape hatch: send any Home Assistant WebSocket API command (e.g. 'config/label_registry/create', 'config/floor_registry/list', 'backup/info'). Prefer the specific tools when they fit. Known read-only commands (get_states, config_entries/get, lovelace/config, lovelace/dashboards/list, */list registries, ...) run without asking the user; anything else needs their approval.",
     readOnly: false,
+    readOnlyCall: (a) => HA_WS_READ_COMMANDS.has(a.type),
     input: { type: z.string().regex(/^[\w/.-]+$/), payload: z.record(z.string(), z.unknown()).optional() },
     summary: (a) => a.type,
     async run(ha, a) {
@@ -477,8 +534,10 @@ export const HA_TOOLS: HaTool<any>[] = [
   tool({
     name: "ha_rest",
     title: "Raw REST call",
-    description: "Admin escape hatch: call the Home Assistant Core REST API (path relative to /api, e.g. '/config/scene/config/123').",
+    description:
+      "Admin escape hatch: call the Home Assistant Core REST API (path relative to /api, e.g. '/config/scene/config/123'). GET requests run without asking the user; POST and DELETE need their approval.",
     readOnly: false,
+    readOnlyCall: (a) => a.method === "GET",
     input: { method: z.enum(["GET", "POST", "DELETE"]), path: z.string().startsWith("/"), body: z.unknown().optional() },
     summary: (a) => `${a.method} ${a.path}`,
     async run(ha, a) {
