@@ -7,6 +7,9 @@
   `.codex/skills/` (each skill a folder with a `SKILL.md`). Claude used to see only
   `CLAUDE.md`; Codex did not see `CLAUDE.md` or `.claude/skills`. Twinmind passes them as
   text (Claude Code's project settings, which could also load hooks, stay off).
+- Shared memory: both assistants are told to remember lasting facts and preferences (or
+  whatever you ask them to remember) as short dated bullets under `## Memory` in
+  `/config/AGENTS.md`, so the other assistant and every later chat know them too.
 
 ## 0.5.0
 
