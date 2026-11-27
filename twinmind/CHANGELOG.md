@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0
+
+- Codex: pick the thinking level (Low, Medium, High, Extra high, ... as the model supports)
+  in a new chip next to the model.
+- Codex: the vague "Default" model is gone; the list shows the real models and preselects
+  the one Codex recommends. The chosen model and thinking level are sent with every message
+  (before, "Default" kept whatever model an earlier message in the chat had used).
+- Codex: no more double approvals for Home Assistant changes. Codex asked again for every
+  HA tool call on top of Twinmind's own decision by mode.
+- Codex **Auto** makes Home Assistant changes without asking, like Full access; only raw
+  WebSocket/REST calls still ask.
+
 ## 0.3.9
 
 - The model button shows the selected model (e.g. Default, Opus, Sonnet) next to the logo.

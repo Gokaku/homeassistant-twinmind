@@ -34,7 +34,7 @@ const MODES: (ModeInfo & Policy)[] = [
   {
     id: "auto",
     label: "Auto",
-    description: "Edits /config and runs sandboxed commands without asking; asks for HA changes",
+    description: "Edits /config, runs sandboxed commands and makes HA changes without asking; asks for raw HA API calls and to leave the sandbox",
     risk: "elevated",
     approvalPolicy: "on-request",
     sandbox: "workspace-write",
@@ -50,6 +50,56 @@ const MODES: (ModeInfo & Policy)[] = [
 ];
 
 
+
+const EFFORT_LABELS: Record<string, string> = {
+  none: "None",
+  minimal: "Minimal",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  xhigh: "Extra high",
+  max: "Max",
+  ultra: "Ultra",
+};
+const effortLabel = (e: string) => EFFORT_LABELS[e] ?? e.charAt(0).toUpperCase() + e.slice(1);
+
+/** Twinmind's model list from Codex's model/list result. Exactly one model is the default. */
+export function modelsFromList(r: any): ModelInfo[] {
+  const list: ModelInfo[] = (r?.data ?? [])
+    .filter((m: any) => !m.hidden)
+    .map((m: any) => {
+      const efforts = (Array.isArray(m.supportedReasoningEfforts) ? m.supportedReasoningEfforts : [])
+        .map((e: any) => String(e?.reasoningEffort ?? ""))
+        .filter(Boolean);
+      const descriptions = new Map<string, string>(
+        (m.supportedReasoningEfforts ?? []).map((e: any) => [String(e?.reasoningEffort), e?.description]),
+      );
+      return {
+        id: m.model ?? m.id,
+        label: m.displayName || m.model || m.id,
+        description: m.description || undefined,
+        isDefault: !!m.isDefault,
+        efforts: efforts.length
+          ? efforts.map((id: string) => ({ id, label: effortLabel(id), description: descriptions.get(id) || undefined }))
+          : undefined,
+        defaultEffort: efforts.length ? (efforts.includes(m.defaultReasoningEffort) ? m.defaultReasoningEffort : efforts[0]) : undefined,
+      };
+    });
+  if (list.length && !list.some((m) => m.isDefault)) list[0].isDefault = true;
+  return list;
+}
+
+/**
+ * The model and thinking level a turn runs with. Both are always sent explicitly: Codex keeps
+ * a thread's last model and effort when a turn leaves them out, so "the default" would
+ * otherwise silently mean "whatever the previous turn used".
+ */
+export function pickModel(models: ModelInfo[], model?: string, effort?: string): { model: string | null; effort: string | null } {
+  const m = models.find((x) => x.id === model) ?? models.find((x) => x.isDefault) ?? models[0];
+  if (!m) return { model: model || null, effort: null };
+  const e = m.efforts?.some((x) => x.id === effort) ? effort! : (m.defaultEffort ?? null);
+  return { model: m.id, effort: e };
+}
 
 interface ActiveTurn {
   ctx: TurnContext;
@@ -114,6 +164,9 @@ export function threadConfig(mcp: { url: string } | undefined): Record<string, u
               bearer_token_env_var: MCP_SECRET_VAR,
               // Changes wait for the user's approval in the app: give them time.
               tool_timeout_sec: 1800,
+              // Twinmind's MCP server decides about every change itself (by the chat's mode).
+              // Without this Codex asked again on top of that for every non-read-only tool.
+              default_tools_approval_mode: "approve",
             },
           },
         }
@@ -169,16 +222,12 @@ export class CodexProvider implements Provider {
 
   async models(): Promise<ModelInfo[]> {
     if (this.modelCache && Date.now() - this.modelCache.at < 10 * 60_000) return this.modelCache.models;
-    const base: ModelInfo[] = [{ id: "", label: "Default", description: "Codex's default model" }];
     try {
-      const r = await this.client().call("model/list", {}, 15_000);
-      const list: ModelInfo[] = (r?.data ?? [])
-        .filter((m: any) => !m.hidden)
-        .map((m: any) => ({ id: m.model ?? m.id, label: m.displayName ?? m.id, description: m.description }));
-      this.modelCache = { at: Date.now(), models: [...base, ...list] };
-      return this.modelCache.models;
+      const list = modelsFromList(await this.client().call("model/list", {}, 15_000));
+      if (list.length) this.modelCache = { at: Date.now(), models: list };
+      return list;
     } catch {
-      return base;
+      return [];
     }
   }
 
@@ -210,11 +259,12 @@ export class CodexProvider implements Provider {
     }
     const rpc = this.client();
     const policy = MODES.find((m) => m.id === ctx.mode) ?? MODES[1];
+    const { model, effort } = pickModel(await this.models(), ctx.model, ctx.effort);
     const common = {
       cwd: ctx.cwd,
       approvalPolicy: policy.approvalPolicy,
       sandbox: policy.sandbox,
-      model: ctx.model || null,
+      model,
       developerInstructions: HA_INSTRUCTIONS,
       // Home Assistant tools, and the MCP secret kept out of the commands Codex runs.
       config: threadConfig(ctx.mcp),
@@ -270,7 +320,8 @@ export class CodexProvider implements Provider {
           input,
           approvalPolicy: policy.approvalPolicy,
           sandboxPolicy: sandboxPolicyFor(ctx.mode, ctx.cwd),
-          model: ctx.model || null,
+          model,
+          effort,
         })
         .then((r) => {
           turn.turnId = r?.turn?.id ?? null;

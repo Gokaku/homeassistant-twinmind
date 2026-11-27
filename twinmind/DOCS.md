@@ -63,7 +63,7 @@ green = read only, blue = asks first, amber = acts on its own within limits, red
 | --- | --- |
 | Read only | Reads files; asks before any change |
 | Ask | Asks before anything that is not a known-safe read (default) |
-| Auto | Works in `/config` on its own; asks to go beyond the sandbox |
+| Auto | Works in `/config` and makes Home Assistant changes on its own; asks to go beyond the sandbox and for raw HA API calls |
 | Full access | No sandbox, no questions |
 
 **Bypass** and **Full access** let the assistant run any command inside the add-on container
@@ -73,9 +73,20 @@ When an approval card appears you can *Deny*, *Allow* once, or allow *Always* fo
 that conversation.
 
 Changes to Home Assistant itself (renames, services, automations) follow the same idea:
-they run without asking only in **Bypass** / **Full access**, are refused in **Plan**,
-**Read only** and **Don't ask**, and show an approval card in every other mode. Twinmind
-enforces this itself, so it applies to Claude and Codex alike.
+they run without asking in **Bypass** / **Full access** and in Codex's **Auto** (except raw
+WebSocket/REST calls, which always ask), are refused in **Plan**, **Read only** and
+**Don't ask**, and show an approval card in every other mode. Twinmind enforces this itself,
+for Claude and Codex alike.
+
+## Models and thinking
+
+The model button next to the microphone lists the exact models of both assistants. For Codex
+the model Codex itself recommends is preselected until you pick another one, and Twinmind
+always tells Codex exactly which model to use.
+
+For Codex models you also pick the thinking level (*Low*, *Medium*, *High*, *Extra high*, ...,
+whatever the model supports) in the chip next to the model. It starts at the model's own
+default and is remembered on this device.
 
 ## Questions, plans and context
 

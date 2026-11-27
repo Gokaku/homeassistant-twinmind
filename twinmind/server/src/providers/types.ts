@@ -37,6 +37,8 @@ export interface TurnContext {
   attachments: StoredUpload[];
   mode: string;
   model?: string;
+  /** Thinking level picked by the user, if the model supports choosing one. */
+  effort?: string;
   cwd: string;
   /** Native session/thread id to resume, if this provider has seen the conversation before. */
   nativeId?: string;

@@ -24,7 +24,19 @@ export class MockProvider implements Provider {
   constructor(private readonly delayMs = 25) {}
 
   async models(): Promise<ModelInfo[]> {
-    return [{ id: "mock-1", label: "Mock 1" }];
+    return [
+      {
+        id: "mock-1",
+        label: "Mock 1",
+        isDefault: true,
+        efforts: [
+          { id: "low", label: "Low" },
+          { id: "medium", label: "Medium" },
+          { id: "high", label: "High" },
+        ],
+        defaultEffort: "medium",
+      },
+    ];
   }
 
   async auth(): Promise<AuthState> {

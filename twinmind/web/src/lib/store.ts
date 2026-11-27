@@ -8,6 +8,7 @@ import type {
   ClientMessage,
   Conversation,
   ConversationMeta,
+  ModelInfo,
   Part,
   ProviderId,
   ProviderInfo,
@@ -27,6 +28,8 @@ export interface State {
   provider: ProviderId;
   modes: Partial<Record<ProviderId, string>>;
   models: Partial<Record<ProviderId, string>>;
+  /** Thinking level per provider (applies when the picked model supports it). */
+  efforts: Partial<Record<ProviderId, string>>;
   /** A send is in flight and no conversation event has confirmed it yet. */
   pending: string | null;
 }
@@ -42,6 +45,7 @@ let state: State = {
   provider: loadPref<ProviderId>("provider", "claude"),
   modes: loadPref("modes", {}),
   models: loadPref("models", {}),
+  efforts: loadPref("efforts", {}),
   pending: null,
 };
 
@@ -312,6 +316,26 @@ export function setModel(p: ProviderId, model: string) {
   savePref("models", state.models);
 }
 
+/** The model a message goes to: the picked one, else the assistant's default, else the first. */
+export function currentModel(s: State, p: ProviderId = s.provider): ModelInfo | undefined {
+  const models = s.providers.find((x) => x.id === p)?.models ?? [];
+  const picked = s.models[p];
+  return models.find((m) => m.id === picked) ?? models.find((m) => m.isDefault) ?? models[0];
+}
+
+/** The thinking level a message uses, if its model lets you choose one. */
+export function currentEffort(s: State, p: ProviderId = s.provider): string | undefined {
+  const m = currentModel(s, p);
+  if (!m?.efforts?.length) return undefined;
+  const picked = s.efforts[p];
+  return m.efforts.some((e) => e.id === picked) ? picked : (m.defaultEffort ?? m.efforts[0].id);
+}
+
+export function setEffort(p: ProviderId, effort: string) {
+  set({ efforts: { ...state.efforts, [p]: effort } });
+  savePref("efforts", state.efforts);
+}
+
 export interface OutgoingFile {
   url: string;
   mediaType: string;
@@ -328,7 +352,8 @@ export async function sendMessage(text: string, files: OutgoingFile[]): Promise<
   const from = state.currentId;
   const provider = state.provider;
   const mode = currentMode(state);
-  const model = state.models[provider] || undefined;
+  const model = currentModel(state)?.id || undefined;
+  const effort = currentEffort(state);
   const clientRequestId = crypto.randomUUID?.() ?? String(Math.random());
   set({ pending: clientRequestId });
   try {
@@ -343,7 +368,7 @@ export async function sendMessage(text: string, files: OutgoingFile[]): Promise<
       inflight = { id: clientRequestId, from, resolve, reject };
     });
     const timer = setTimeout(() => settleInflight(new Error("The server did not confirm the message. Please try again.")), 20_000);
-    const ok = send({ type: "send", clientRequestId, conversationId: from ?? undefined, provider, mode, model, text, attachments });
+    const ok = send({ type: "send", clientRequestId, conversationId: from ?? undefined, provider, mode, model, effort, text, attachments });
     if (!ok) settleInflight(new Error("Not connected. Reconnecting…"));
     try {
       await confirmed;
