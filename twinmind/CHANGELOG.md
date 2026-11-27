@@ -3,7 +3,9 @@
 ## 0.4.0
 
 - Model, thinking level and permission mode are in one button in the composer, which opens
-  them all in one dialog: more room on phones.
+  them all in one dialog: more room on phones. The button never cuts text off: when space is
+  short it leaves out whole parts (first the "GPT-" prefix, then the thinking level, then the
+  mode) instead. The dialog fits phones in portrait and landscape.
 - Thinking level (Low, Medium, High, Extra high, Max, ... as the model supports) can be
   picked for Claude and Codex.
 - The vague "Default" model is gone. Claude's models now come from Claude Code itself (the
