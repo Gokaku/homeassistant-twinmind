@@ -73,11 +73,15 @@ When an approval card appears you can *Deny*, *Allow* once, or allow *Always* fo
 that conversation.
 
 Changes to Home Assistant itself (renames, services, automations) follow the same idea:
-they run without asking in **Bypass** / **Full access** and in **Auto** (except raw
-WebSocket/REST calls, which always ask), are refused in **Plan**, **Read only** and
-**Don't ask**, and show an approval card in every other mode. Twinmind enforces this itself,
-for Claude and Codex alike. Reading never asks, including raw WebSocket commands known to only
-read (such as `config_entries/get` or `lovelace/config`) and REST `GET` requests.
+they run without asking in **Bypass** / **Full access** and in **Auto**, are refused in
+**Plan**, **Read only** and **Don't ask**, and show an approval card in every other mode.
+Twinmind enforces this itself, for Claude and Codex alike. Reading never asks.
+
+Raw WebSocket/REST commands are judged by what they do: reads (`config_entries/get`,
+`lovelace/config`, `…/list`, REST `GET`, ...) never ask, ordinary changes follow the mode like
+the other tools (*Always* applies to that one command), and sensitive commands (users,
+tokens, sign-in, Supervisor, backups, cloud, OAuth credentials) ask every time unless the
+mode is Full access / Bypass.
 
 ## Models and thinking
 

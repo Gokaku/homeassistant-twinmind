@@ -86,19 +86,27 @@ function autoAnswer(decision: "allow" | "allow-session" | "deny") {
 }
 
 describe("Home Assistant approval gate", () => {
-  it("never remembers 'Always' for the raw WebSocket/REST tools", async () => {
+  it("remembers 'Always' for one raw command only, and never for sensitive ones", async () => {
     const answer = autoAnswer("allow-session");
     const results: boolean[] = [];
+    const calls: [string, any][] = [
+      ["ha_websocket", { type: "config_entries/delete" }],
+      ["ha_websocket", { type: "config_entries/delete" }], // remembered
+      ["ha_websocket", { type: "config/area_registry/create" }], // another command: asks
+      ["ha_websocket", { type: "auth/long_lived_access_token" }],
+      ["ha_websocket", { type: "auth/long_lived_access_token" }], // sensitive: asks again
+      ["ha_rest", { method: "POST", path: "/hassio/addons/x/start" }],
+      ["ha_rest", { method: "POST", path: "/hassio/addons/x/start" }], // sensitive: asks again
+      ["ha_update_entity", {}],
+      ["ha_update_entity", {}], // remembered
+    ];
     await turn("ask", async (ctx) => {
       const s = chat.session(tokenOf(ctx))!;
-      for (const name of ["ha_websocket", "ha_websocket", "ha_rest", "ha_rest", "ha_update_entity", "ha_update_entity"]) {
-        results.push((await s.decide(tool(name), {}, name)).ok);
-      }
+      for (const [name, args] of calls) results.push((await s.decide(tool(name), args, name)).ok);
     });
     answer.stop();
     expect(results.every(Boolean)).toBe(true);
-    // Raw tools: asked every time (2 + 2). Specific tool: asked once, then remembered.
-    expect(answer.asked()).toBe(5);
+    expect(answer.asked()).toBe(7);
   });
 
   it("refuses a change from a turn that has already ended", async () => {
