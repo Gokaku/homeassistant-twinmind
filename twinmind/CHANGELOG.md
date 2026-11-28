@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.0
+
+- **A real Auto mode**: every risky step is checked automatically and allowed or blocked
+  without asking you.
+  - Codex: its automatic reviewer (`auto_review`) judges commands that leave the sandbox,
+    network access and Home Assistant changes by risk and by what you asked for.
+  - Claude: Claude Code's auto-mode classifier now also reviews Home Assistant changes (they
+    used to skip it).
+  - When something is blocked, the chat says what and why. Only sensitive Home Assistant
+    commands (users, tokens, sign-in, Supervisor, backups, cloud) still ask you.
+- Codex threads are unloaded after each reply, so a mode change always takes full effect
+  in the next reply.
+
 ## 0.5.1
 
 - Both assistants now always read your project instructions and skills in `/config`:
