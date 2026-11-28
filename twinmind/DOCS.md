@@ -117,6 +117,14 @@ delete the notes there yourself.
 They are part of `/config`, so Home Assistant backups include them. Assistants that may edit
 `/config` without asking can also change these files.
 
+## Sub-agents
+
+Both assistants can hand parts of a bigger task to sub-agents that work in parallel (Claude:
+its Agent tool; Codex: `spawn_agent`). Ask for it ("use sub-agents to check every dashboard")
+or let the assistant decide. Sub-agents run with the chat's mode, their approval questions
+appear in the chat, and each one shows as a card. They belong to the reply that started them:
+when the reply ends or you press *Stop*, they stop too.
+
 ## Writing while the assistant works
 
 You can keep typing while a reply runs. What you send goes straight into the running reply

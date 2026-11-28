@@ -107,6 +107,8 @@ interface ActiveTurn {
   flush: Map<string, NodeJS.Timeout>;
   error: string | null;
   retrying: boolean;
+  /** Sub-agent threads this turn started (directly or through other sub-agents). */
+  agents: Set<string>;
   resolve: (status: "completed" | "interrupted") => void;
   reject: (e: Error) => void;
 }
@@ -153,6 +155,9 @@ export function threadConfig(mcp: { url: string } | undefined, mode = "untrusted
     // - a goal (create_goal) makes Codex start new turns on its own, in a loop, with the last
     //   turn's sandbox (Full access: unsandboxed, without approvals).
     // multi_agent_v2 is off by default in codex 0.172 but is the successor of multi_agent.
+    // Note: in 0.172 the model catalog still offers the collaboration tools (spawn_agent, ...)
+    // with both off; Twinmind ties sub-agents to the turn and stops them when it ends (see
+    // trackAgents). Goals are really off (no goal tools are offered).
     features: { multi_agent: false, multi_agent_v2: false, goals: false },
     ...(mcp
       ? {
@@ -186,6 +191,16 @@ export class CodexProvider implements Provider {
   private modelCache: { at: number; models: ModelInfo[] } | null = null;
   /** Threads being unloaded after their turn; the next turn on them waits for it. */
   private unloading = new Map<string, Promise<unknown>>();
+  /**
+   * Sub-agents. Codex 0.172 offers its collaboration tools (spawn_agent, ...) whatever the
+   * multi_agent features say: the model catalog enables them. A sub-agent is a thread of its
+   * own that keeps running when the turn that spawned it ends, with that turn's sandbox and
+   * where nobody can see or stop it. So each one is tied to the Twinmind turn it belongs to
+   * and stopped when that turn ends.
+   */
+  private agentRoot = new Map<string, string>(); // sub-agent thread -> thread of its Twinmind turn
+  private agentTurn = new Map<string, string>(); // sub-agent thread -> its running turn
+  private stoppedAgents = new Set<string>(); // must not run any more: stop whatever they start
 
   constructor(private readonly opts: { cwd: string; bin?: string | null }) {}
 
@@ -303,6 +318,7 @@ export class CodexProvider implements Provider {
         flush: new Map(),
         error: null,
         retrying: false,
+        agents: new Set(),
         resolve: (s) => (cleanup(), resolve({ status: s })),
         reject: (e) => (cleanup(), reject(e)),
       };
@@ -312,6 +328,7 @@ export class CodexProvider implements Provider {
         setTimeout(() => this.turns.get(threadId) === turn && turn.resolve("interrupted"), 5000).unref();
       };
       const cleanup = () => {
+        this.stopAgentsOf(turn);
         // Unload the thread: the next turn loads it again with that turn's settings (Codex keeps
         // a loaded thread's config, e.g. how HA tools are approved, when it is resumed).
         const unloading = rpc.call("thread/unsubscribe", { threadId }, 10_000).catch(() => {});
@@ -412,6 +429,35 @@ export class CodexProvider implements Provider {
           input: item.arguments,
           state: item.success === false ? "error" : state(item.status),
         };
+      case "collabAgentToolCall": {
+        const st = item.status === "inProgress" ? "running" : item.status === "failed" ? "error" : item.status === "interrupted" ? "error" : "completed";
+        const states = Object.values(item.agentsStates ?? {}) as any[];
+        const tool = String(item.tool ?? "agent");
+        const label: Record<string, string> = { spawnAgent: "Sub-agent", wait: "Wait for sub-agents", sendInput: "Message to sub-agent", sendMessage: "Message to sub-agent", followupTask: "Follow-up for sub-agent", interruptAgent: "Stop sub-agent", closeAgent: "Close sub-agent", resumeAgent: "Resume sub-agent", listAgents: "List sub-agents" };
+        return {
+          type: "tool",
+          id: item.id,
+          name: `collaboration.${tool}`,
+          kind: "agent",
+          title: truncate(`${label[tool] ?? tool}${item.prompt ? `: ${item.prompt}` : ""}`, 160),
+          input: item.prompt ? { prompt: item.prompt, model: item.model ?? undefined } : undefined,
+          output: states.map((a) => [a.status, a.message].filter(Boolean).join(": ")).filter(Boolean).join("\n") || undefined,
+          state: st,
+        };
+      }
+      case "subAgentActivity": {
+        // Codex 0.172 reports sub-agents this way: one card per sub-agent, updated as it goes.
+        const name = String(item.agentPath ?? "").split("/").filter(Boolean).pop() ?? "agent";
+        return {
+          type: "tool",
+          id: `agent:${item.agentThreadId ?? item.id}`,
+          name: "collaboration.spawn_agent",
+          kind: "agent",
+          title: `Sub-agent ${name}`,
+          input: { agent: item.agentPath, model: item.model ?? undefined },
+          state: item.kind === "completed" ? "completed" : item.kind === "interrupted" ? "error" : "running",
+        };
+      }
       case "webSearch":
         return {
           type: "tool",
@@ -432,6 +478,7 @@ export class CodexProvider implements Provider {
       this.login = null;
       return;
     }
+    if (p?.threadId) this.trackAgents(method, p);
     const turn = p?.threadId ? this.turns.get(p.threadId) : undefined;
     if (!turn) return;
     const { emit } = turn.ctx;
@@ -561,10 +608,54 @@ export class CodexProvider implements Provider {
     }
   }
 
+  /** Sub-agent bookkeeping: who belongs to which turn, and stopping those whose turn ended. */
+  private trackAgents(method: string, p: any) {
+    const thread: string = p.threadId;
+    if (method === "turn/started" && (this.agentRoot.has(thread) || this.stoppedAgents.has(thread))) {
+      if (p.turn?.id) this.agentTurn.set(thread, p.turn.id);
+      if (this.stoppedAgents.has(thread)) this.stopAgent(thread);
+    }
+    if (method === "turn/completed" && this.agentTurn.get(thread) === p.turn?.id) this.agentTurn.delete(thread);
+    const item = p.item;
+    if (!method.startsWith("item/") || (item?.type !== "collabAgentToolCall" && item?.type !== "subAgentActivity")) return;
+    const ids: string[] = item.type === "collabAgentToolCall" ? (item.receiverThreadIds ?? []) : item.agentThreadId ? [item.agentThreadId] : [];
+    const root = this.turns.has(thread) ? thread : this.agentRoot.get(thread);
+    for (const id of ids) {
+      if (!id || id === thread || this.turns.has(id)) continue;
+      const turn = root ? this.turns.get(root) : undefined;
+      if (turn && root) {
+        this.agentRoot.set(id, root);
+        turn.agents.add(id);
+      } else {
+        // Spawned by something whose turn already ended.
+        this.stoppedAgents.add(id);
+        this.stopAgent(id);
+      }
+    }
+  }
+
+  private stopAgent(thread: string) {
+    this.stoppedAgents.add(thread);
+    const turnId = this.agentTurn.get(thread);
+    // Without a turn id yet, the turn/started notification stops it as soon as it starts.
+    if (turnId) void this.rpc?.call("turn/interrupt", { threadId: thread, turnId }, 10_000).catch(() => {});
+  }
+
+  /** Stop every sub-agent of a Twinmind turn that has ended. */
+  private stopAgentsOf(turn: ActiveTurn) {
+    for (const id of turn.agents) {
+      this.stopAgent(id);
+      this.agentRoot.delete(id);
+    }
+    turn.agents.clear();
+  }
+
   private async onRequest(req: ServerRequestMsg) {
     const rpc = this.rpc!;
     const p = req.params ?? {};
-    const turn = p.threadId ? this.turns.get(p.threadId) : p.conversationId ? this.turns.get(p.conversationId) : undefined;
+    // A sub-agent's request is shown in the chat of the turn it belongs to.
+    const thread: string | undefined = p.threadId ?? p.conversationId;
+    const turn = thread ? (this.turns.get(thread) ?? this.turns.get(this.agentRoot.get(thread) ?? "")) : undefined;
     if (!turn) {
       // No UI to ask: be safe and decline.
       return this.declineUnknown(req);

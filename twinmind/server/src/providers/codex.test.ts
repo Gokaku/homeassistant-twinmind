@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { findProjectCodexConfig, modelsFromList, sandboxPolicyFor, threadConfig } from "./codex.js";
+import { CodexProvider, findProjectCodexConfig, modelsFromList, sandboxPolicyFor, threadConfig } from "./codex.js";
 import { pickModel } from "./models.js";
 
 describe("findProjectCodexConfig", () => {
@@ -93,5 +93,53 @@ describe("models and thinking levels", () => {
     expect(pickModel(list, "gone", "high")).toEqual({ model: "gpt-b", effort: "high" });
     // Without a model list (e.g. while signed out) nothing is invented.
     expect(pickModel([], "gpt-a", "high")).toEqual({ model: "gpt-a", effort: null });
+  });
+});
+
+describe("sub-agents", () => {
+  /** A provider with a fake app-server connection that records what it is asked to do. */
+  function setup() {
+    const p: any = new CodexProvider({ cwd: "/config", bin: "/nonexistent" });
+    const calls: [string, any][] = [];
+    p.rpc = { call: async (m: string, params: any) => (calls.push([m, params]), {}) };
+    const turn = { agents: new Set<string>(), ctx: { emit: () => {} }, parts: new Map(), textItems: new Set(), flush: new Map() };
+    p.turns.set("main", turn);
+    return { p, calls, turn };
+  }
+  const activity = (thread: string, agent: string, kind = "started") => ({
+    threadId: thread,
+    item: { type: "subAgentActivity", id: `x-${agent}`, kind, agentThreadId: agent, agentPath: `/root/${agent}` },
+  });
+
+  it("stops every sub-agent of a turn when the turn ends, including ones they spawned", () => {
+    const { p, calls, turn } = setup();
+    p.onNotification("item/started", activity("main", "a"));
+    p.onNotification("turn/started", { threadId: "a", turn: { id: "ta" } });
+    p.onNotification("item/started", activity("a", "b")); // spawned by the sub-agent
+    p.onNotification("turn/started", { threadId: "b", turn: { id: "tb" } });
+    expect([...turn.agents].sort()).toEqual(["a", "b"]);
+    expect(calls).toEqual([]);
+    p.stopAgentsOf(turn);
+    expect(calls).toEqual([
+      ["turn/interrupt", { threadId: "a", turnId: "ta" }],
+      ["turn/interrupt", { threadId: "b", turnId: "tb" }],
+    ]);
+  });
+
+  it("stops a sub-agent that starts working after its turn ended", () => {
+    const { p, calls, turn } = setup();
+    p.onNotification("item/started", activity("main", "late"));
+    p.stopAgentsOf(turn); // it has no turn yet: nothing to interrupt
+    expect(calls).toEqual([]);
+    p.onNotification("turn/started", { threadId: "late", turn: { id: "t1" } });
+    expect(calls).toEqual([["turn/interrupt", { threadId: "late", turnId: "t1" }]]);
+  });
+
+  it("shows a sub-agent as one card that follows its progress", () => {
+    const { p } = setup();
+    const a = p.toolFromItem(activity("main", "slow").item);
+    const done = p.toolFromItem(activity("main", "slow", "completed").item);
+    expect(a).toMatchObject({ id: "agent:slow", kind: "agent", title: "Sub-agent slow", state: "running" });
+    expect(done).toMatchObject({ id: "agent:slow", state: "completed" });
   });
 });
