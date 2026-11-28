@@ -55,7 +55,7 @@ mode under *Permission mode*; the mode's description is shown below it.
 | Ask | Asks before edits and commands (default) |
 | Plan | Explores read-only and proposes a plan; you approve the plan |
 | Accept edits | Edits files without asking, still asks for commands |
-| Auto | A safety classifier approves or blocks each action; HA changes run without asking |
+| Auto | A safety classifier reviews every action, HA changes included, and allows or blocks it |
 | Don't ask | Never asks; anything not pre-approved is denied |
 | Bypass | Runs everything without asking |
 
@@ -63,7 +63,7 @@ mode under *Permission mode*; the mode's description is shown below it.
 | --- | --- |
 | Read only | Reads files; asks before any change |
 | Ask | Asks before anything that is not a known-safe read (default) |
-| Auto | Works in `/config` and makes Home Assistant changes on its own; asks to go beyond the sandbox and for raw HA API calls |
+| Auto | Works in `/config` on its own; Codex's automatic reviewer checks every risky step (leaving the sandbox, network, HA changes) and allows or blocks it |
 | Full access | No sandbox, no questions |
 
 **Bypass** and **Full access** let the assistant run any command inside the add-on container
@@ -73,8 +73,10 @@ When an approval card appears you can *Deny*, *Allow* once, or allow *Always* fo
 that conversation.
 
 Changes to Home Assistant itself (renames, services, automations) follow the same idea:
-they run without asking in **Bypass** / **Full access** and in **Auto**, are refused in
-**Plan**, **Read only** and **Don't ask**, and show an approval card in every other mode.
+they run without asking in **Bypass** / **Full access**, are checked by the assistant's automatic
+reviewer in **Auto** (allowed or blocked without asking you; a blocked step is explained in the
+chat), are refused in **Plan**, **Read only** and **Don't ask**, and show an approval card in
+every other mode.
 Twinmind enforces this itself, for Claude and Codex alike. Reading never asks.
 
 Raw WebSocket/REST commands are judged by what they do: reads (`config_entries/get`,

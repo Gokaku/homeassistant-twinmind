@@ -53,7 +53,7 @@ const MODES: ModeInfo[] = [
   { id: "default", label: "Ask", description: "Asks before edits and commands", risk: "normal" },
   { id: "plan", label: "Plan", description: "Read-only: explores and proposes a plan", risk: "safe" },
   { id: "acceptEdits", label: "Accept edits", description: "Edits /config without asking (config can run code); asks for commands and HA changes", risk: "elevated" },
-  { id: "auto", label: "Auto", description: "A safety classifier approves or blocks commands and edits; HA changes run without asking (raw HA API calls ask)", risk: "elevated" },
+  { id: "auto", label: "Auto", description: "A safety classifier reviews every action, HA changes included, and allows or blocks it; asks only for sensitive HA commands (users, tokens, Supervisor, backups)", risk: "elevated" },
   { id: "dontAsk", label: "Don't ask", description: "Never asks; denies anything not pre-approved", risk: "safe" },
   { id: "bypassPermissions", label: "Bypass", description: "Runs everything without asking, as root, including HA changes", risk: "danger" },
 ];
@@ -472,14 +472,16 @@ export class ClaudeProvider implements Provider {
         includePartialMessages: true,
         canUseTool,
         // Twinmind's Home Assistant tools. Approval for changes is enforced by Twinmind's MCP gate,
-        // so Claude itself does not prompt for them.
+        // so Claude itself does not prompt for them, except in Auto: there Claude Code's auto-mode
+        // classifier reviews each HA change like any other action and allows or blocks it
+        // (verified with Claude Code 2.1.332; models without auto mode ask instead).
         ...(ctx.mcp
           ? {
               mcpServers: { [HA_MCP_SERVER]: { type: "http" as const, url: ctx.mcp.url, headers: { Authorization: `Bearer ${ctx.mcp.secret}` } } },
               // Over stdin, not the command line: every command Claude runs could read the
               // bearer secret and this chat's MCP URL from /proc/<pid>/cmdline otherwise.
               mcpServersDelivery: "initialize" as const,
-              allowedTools: [`mcp__${HA_MCP_SERVER}`],
+              ...(mode === "auto" ? {} : { allowedTools: [`mcp__${HA_MCP_SERVER}`] }),
             }
           : {}),
         abortController,

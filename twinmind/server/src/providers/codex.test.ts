@@ -43,12 +43,14 @@ describe("threadConfig", () => {
     });
   });
 
-  it("lets Twinmind, not Codex, decide about HA tool calls", () => {
-    // Verified with codex 0.166: without it every non-read-only HA tool raised an extra
-    // MCP approval request from Codex, on top of Twinmind's own approval by mode.
-    expect(threadConfig({ url: "http://127.0.0.1:1/mcp/token" })).toMatchObject({
-      mcp_servers: { homeassistant: { default_tools_approval_mode: "approve" } },
-    });
+  it("has Codex's reviewer check HA changes in Auto only", () => {
+    const mcp = { url: "http://127.0.0.1:1/mcp/token" };
+    // Outside Auto, Twinmind alone decides; in Full access Codex would otherwise block HA
+    // changes ("requires approval, but approval policy is never", codex 0.172).
+    for (const mode of ["read-only", "untrusted", "full-access"])
+      expect(threadConfig(mcp, mode)).toMatchObject({ mcp_servers: { homeassistant: { default_tools_approval_mode: "approve" } } });
+    // In Auto, Codex's default for tools that are not read-only applies: auto_review checks them.
+    expect((threadConfig(mcp, "auto") as any).mcp_servers.homeassistant).not.toHaveProperty("default_tools_approval_mode");
   });
 
   it("turns off everything that keeps working after the turn ended", () => {

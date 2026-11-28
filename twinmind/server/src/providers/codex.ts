@@ -15,7 +15,12 @@ import type { StoredUpload } from "../uploads.js";
 /** Environment variable the app-server reads the MCP bearer secret from. */
 const MCP_SECRET_VAR = "TWINMIND_MCP_SECRET";
 
-type Policy = { approvalPolicy: string; sandbox: "read-only" | "workspace-write" | "danger-full-access" };
+type Policy = {
+  approvalPolicy: string;
+  sandbox: "read-only" | "workspace-write" | "danger-full-access";
+  /** Who decides approval requests: the user (in the app), or Codex's automatic reviewer. */
+  reviewer: "user" | "auto_review";
+};
 
 const MODES: (ModeInfo & Policy)[] = [
   {
@@ -25,6 +30,7 @@ const MODES: (ModeInfo & Policy)[] = [
     risk: "safe",
     approvalPolicy: "on-request",
     sandbox: "read-only",
+    reviewer: "user",
   },
   {
     id: "untrusted",
@@ -33,14 +39,17 @@ const MODES: (ModeInfo & Policy)[] = [
     risk: "normal",
     approvalPolicy: "untrusted",
     sandbox: "workspace-write",
+    reviewer: "user",
   },
   {
     id: "auto",
     label: "Auto",
-    description: "Edits /config, runs sandboxed commands and makes HA changes without asking; asks for raw HA API calls and to leave the sandbox",
+    description:
+      "Works in /config on its own; an automatic reviewer checks risky steps (leaving the sandbox, HA changes) and allows or blocks them. Asks only for sensitive HA commands (users, tokens, Supervisor, backups)",
     risk: "elevated",
     approvalPolicy: "on-request",
     sandbox: "workspace-write",
+    reviewer: "auto_review",
   },
   {
     id: "full-access",
@@ -49,6 +58,7 @@ const MODES: (ModeInfo & Policy)[] = [
     risk: "danger",
     approvalPolicy: "never",
     sandbox: "danger-full-access",
+    reviewer: "user",
   },
 ];
 
@@ -131,7 +141,7 @@ export function sandboxPolicyFor(mode: string, cwd: string): Record<string, unkn
 }
 
 /** Config overrides for thread/start and thread/resume. */
-export function threadConfig(mcp: { url: string } | undefined): Record<string, unknown> {
+export function threadConfig(mcp: { url: string } | undefined, mode = "untrusted"): Record<string, unknown> {
   return {
     // The app-server needs the MCP secret in its environment (bearer_token_env_var), but the
     // commands Codex runs inherit that environment: keep the secret out of theirs.
@@ -153,9 +163,11 @@ export function threadConfig(mcp: { url: string } | undefined): Record<string, u
               bearer_token_env_var: MCP_SECRET_VAR,
               // Changes wait for the user's approval in the app: give them time.
               tool_timeout_sec: 1800,
-              // Twinmind's MCP server decides about every change itself (by the chat's mode).
-              // Without this Codex asked again on top of that for every non-read-only tool.
-              default_tools_approval_mode: "approve",
+              // Twinmind's MCP server decides about every change itself (by the chat's mode). In
+              // Auto, Codex's automatic reviewer checks HA changes first (its default for tools that
+              // are not read-only); elsewhere Codex must not ask (in Full access it would block them:
+              // "requires approval, but approval policy is never", verified with codex 0.172).
+              ...(MODES.find((m) => m.id === mode)?.reviewer === "auto_review" ? {} : { default_tools_approval_mode: "approve" }),
             },
           },
         }
@@ -172,6 +184,8 @@ export class CodexProvider implements Provider {
   private turns = new Map<string, ActiveTurn>(); // by threadId
   private login: { loginId: string; url: string; code: string } | null = null;
   private modelCache: { at: number; models: ModelInfo[] } | null = null;
+  /** Threads being unloaded after their turn; the next turn on them waits for it. */
+  private unloading = new Map<string, Promise<unknown>>();
 
   constructor(private readonly opts: { cwd: string; bin?: string | null }) {}
 
@@ -257,9 +271,10 @@ export class CodexProvider implements Provider {
       // AGENTS.md and the .agents/.codex skills Codex reads itself; CLAUDE.md and .claude/skills not.
       developerInstructions: HA_INSTRUCTIONS + projectContext(ctx.cwd, CODEX_NATIVE),
       // Home Assistant tools, and the MCP secret kept out of the commands Codex runs.
-      config: threadConfig(ctx.mcp),
+      config: threadConfig(ctx.mcp, policy.id),
     };
     let started: any = null;
+    if (ctx.nativeId) await this.unloading.get(ctx.nativeId);
     if (ctx.nativeId) {
       try {
         started = await rpc.call("thread/resume", { threadId: ctx.nativeId, excludeTurns: true, ...common });
@@ -297,6 +312,11 @@ export class CodexProvider implements Provider {
         setTimeout(() => this.turns.get(threadId) === turn && turn.resolve("interrupted"), 5000).unref();
       };
       const cleanup = () => {
+        // Unload the thread: the next turn loads it again with that turn's settings (Codex keeps
+        // a loaded thread's config, e.g. how HA tools are approved, when it is resumed).
+        const unloading = rpc.call("thread/unsubscribe", { threadId }, 10_000).catch(() => {});
+        this.unloading.set(threadId, unloading);
+        void unloading.finally(() => this.unloading.get(threadId) === unloading && this.unloading.delete(threadId));
         ctx.signal.removeEventListener("abort", onAbort);
         for (const t of turn.flush.values()) clearTimeout(t);
         this.turns.delete(threadId);
@@ -308,6 +328,7 @@ export class CodexProvider implements Provider {
           threadId,
           input,
           approvalPolicy: policy.approvalPolicy,
+          approvalsReviewer: policy.reviewer,
           sandboxPolicy: sandboxPolicyFor(ctx.mode, ctx.cwd),
           model,
           effort,
@@ -496,6 +517,31 @@ export class CodexProvider implements Provider {
           type: "part",
           part: { type: "todo", id: "todo", items: (p.plan ?? []).map((s: any) => ({ text: s.step, status: status(s.status) })) },
         });
+        break;
+      }
+      case "item/autoApprovalReview/completed": {
+        // Codex's reviewer blocked a step in Auto: say why, the user saw no question.
+        const r = p.review;
+        if (r?.status === "denied") {
+          const a = p.action ?? {};
+          const ha = a.type === "mcpToolCall" && a.server === HA_MCP_SERVER ? HA_TOOLS.find((t) => t.name === a.toolName) : undefined;
+          const what =
+            a.type === "command" ? a.command
+            : a.type === "execve" ? [a.program, ...(a.argv ?? [])].join(" ")
+            : a.type === "applyPatch" ? `changes to ${(a.files ?? []).join(", ")}`
+            : a.type === "networkAccess" ? `network access to ${a.host}`
+            : a.type === "mcpToolCall" ? (ha?.title ?? a.toolTitle ?? `${a.server} · ${a.toolName}`)
+            : "a step";
+          emit({
+            type: "part",
+            part: {
+              type: "notice",
+              id: `review:${p.reviewId ?? randomUUID()}`,
+              level: "warning",
+              text: `Auto review blocked ${truncate(String(what), 120)}${r.rationale ? `: ${truncate(String(r.rationale), 300)}` : ""}`,
+            },
+          });
+        }
         break;
       }
       case "error":
