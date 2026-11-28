@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.1
+
+- **Codex sub-agents**, safely: Codex can hand parts of a task to sub-agents again. They
+  belong to the reply that started them and are stopped when it ends (or when you press
+  Stop), so nothing keeps working where you cannot see it. Their approval questions appear
+  in the chat (they used to be declined silently), and each sub-agent shows as a card.
+- Security fix: since 0.4.0 (Codex 0.172) the switch that kept sub-agents off no longer
+  worked, because the Codex model catalog enables them regardless. A sub-agent could keep
+  running after its reply ended, with that reply's permissions. Twinmind now stops them
+  itself.
+
 ## 0.6.0
 
 - **A real Auto mode**: every risky step is checked automatically and allowed or blocked
