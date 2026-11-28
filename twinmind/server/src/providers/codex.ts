@@ -195,12 +195,13 @@ export class CodexProvider implements Provider {
    * Sub-agents. Codex 0.172 offers its collaboration tools (spawn_agent, ...) whatever the
    * multi_agent features say: the model catalog enables them. A sub-agent is a thread of its
    * own that keeps running when the turn that spawned it ends, with that turn's sandbox and
-   * where nobody can see or stop it. So each one is tied to the Twinmind turn it belongs to
-   * and stopped when that turn ends.
+   * where nobody can see or stop it. So the rule is: a turn may only run in a thread that is a
+   * running Twinmind turn or descends from one (parentThreadId); every other turn is stopped
+   * as soon as it starts, and a Twinmind turn's sub-agents are stopped when it ends.
    */
   private agentRoot = new Map<string, string>(); // sub-agent thread -> thread of its Twinmind turn
   private agentTurn = new Map<string, string>(); // sub-agent thread -> its running turn
-  private stoppedAgents = new Set<string>(); // must not run any more: stop whatever they start
+  private parentOf = new Map<string, string | null>(); // thread -> parentThreadId (from thread/read)
 
   constructor(private readonly opts: { cwd: string; bin?: string | null }) {}
 
@@ -608,36 +609,55 @@ export class CodexProvider implements Provider {
     }
   }
 
-  /** Sub-agent bookkeeping: who belongs to which turn, and stopping those whose turn ended. */
+  /** Sub-agent bookkeeping: who belongs to which turn, and stopping what belongs to none. */
   private trackAgents(method: string, p: any) {
     const thread: string = p.threadId;
-    if (method === "turn/started" && (this.agentRoot.has(thread) || this.stoppedAgents.has(thread))) {
-      if (p.turn?.id) this.agentTurn.set(thread, p.turn.id);
-      if (this.stoppedAgents.has(thread)) this.stopAgent(thread);
+    if (this.turns.has(thread)) {
+      // A Twinmind turn: note the sub-agents it announces, so their requests reach this chat early.
+      const item = p.item;
+      if (method.startsWith("item/") && (item?.type === "collabAgentToolCall" || item?.type === "subAgentActivity")) {
+        const ids: string[] = item.type === "collabAgentToolCall" ? (item.receiverThreadIds ?? []) : item.agentThreadId ? [item.agentThreadId] : [];
+        for (const id of ids) if (id && !this.turns.has(id)) this.adopt(id, thread);
+      }
+      return;
     }
     if (method === "turn/completed" && this.agentTurn.get(thread) === p.turn?.id) this.agentTurn.delete(thread);
-    const item = p.item;
-    if (!method.startsWith("item/") || (item?.type !== "collabAgentToolCall" && item?.type !== "subAgentActivity")) return;
-    const ids: string[] = item.type === "collabAgentToolCall" ? (item.receiverThreadIds ?? []) : item.agentThreadId ? [item.agentThreadId] : [];
-    const root = this.turns.has(thread) ? thread : this.agentRoot.get(thread);
-    for (const id of ids) {
-      if (!id || id === thread || this.turns.has(id)) continue;
-      const turn = root ? this.turns.get(root) : undefined;
-      if (turn && root) {
-        this.agentRoot.set(id, root);
-        turn.agents.add(id);
-      } else {
-        // Spawned by something whose turn already ended.
-        this.stoppedAgents.add(id);
-        this.stopAgent(id);
+    if (method !== "turn/started") return;
+    // A turn in a thread that is not a running Twinmind turn: a sub-agent (or something Codex
+    // started on its own). It may only run for a running Twinmind turn it descends from.
+    if (p.turn?.id) this.agentTurn.set(thread, p.turn.id);
+    void this.rootOf(thread).then((root) => {
+      if (root && this.turns.has(root)) this.adopt(thread, root);
+      else this.stopAgent(thread);
+    });
+  }
+
+  private adopt(thread: string, root: string) {
+    this.agentRoot.set(thread, root);
+    this.turns.get(root)?.agents.add(thread);
+  }
+
+  /** The running Twinmind turn's thread a thread descends from, if any. */
+  private async rootOf(thread: string): Promise<string | null> {
+    let id: string | null = thread;
+    for (let depth = 0; id && depth < 10; depth++) {
+      if (this.turns.has(id)) return id;
+      const known = this.agentRoot.get(id);
+      if (known && this.turns.has(known)) return known;
+      if (!this.parentOf.has(id)) {
+        const r = await this.rpc?.call("thread/read", { threadId: id, includeTurns: false }, 10_000).catch(() => null);
+        this.parentOf.set(id, r?.thread?.parentThreadId ?? null);
       }
+      id = this.parentOf.get(id) ?? null;
     }
+    return null;
   }
 
   private stopAgent(thread: string) {
-    this.stoppedAgents.add(thread);
+    this.agentRoot.delete(thread);
     const turnId = this.agentTurn.get(thread);
-    // Without a turn id yet, the turn/started notification stops it as soon as it starts.
+    // Without a running turn there is nothing to stop; if it starts one later, trackAgents
+    // finds no running Twinmind turn above it and stops that.
     if (turnId) void this.rpc?.call("turn/interrupt", { threadId: thread, turnId }, 10_000).catch(() => {});
   }
 
@@ -645,7 +665,13 @@ export class CodexProvider implements Provider {
   private stopAgentsOf(turn: ActiveTurn) {
     for (const id of turn.agents) {
       this.stopAgent(id);
-      this.agentRoot.delete(id);
+      // Its card would otherwise end up "completed" with the reply.
+      const card = turn.parts.get(`agent:${id}`);
+      if (card?.state === "running") {
+        const stopped: ToolPart = { ...card, state: "error", output: "Stopped: the reply it belonged to ended." };
+        turn.parts.set(card.id, stopped);
+        turn.ctx.emit({ type: "part", part: stopped });
+      }
     }
     turn.agents.clear();
   }
@@ -655,7 +681,8 @@ export class CodexProvider implements Provider {
     const p = req.params ?? {};
     // A sub-agent's request is shown in the chat of the turn it belongs to.
     const thread: string | undefined = p.threadId ?? p.conversationId;
-    const turn = thread ? (this.turns.get(thread) ?? this.turns.get(this.agentRoot.get(thread) ?? "")) : undefined;
+    const root = thread ? (this.turns.has(thread) ? thread : await this.rootOf(thread)) : null;
+    const turn = root ? this.turns.get(root) : undefined;
     if (!turn) {
       // No UI to ask: be safe and decline.
       return this.declineUnknown(req);

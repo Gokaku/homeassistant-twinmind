@@ -9,7 +9,8 @@
 - Security fix: since 0.4.0 (Codex 0.172) the switch that kept sub-agents off no longer
   worked, because the Codex model catalog enables them regardless. A sub-agent could keep
   running after its reply ended, with that reply's permissions. Twinmind now stops them
-  itself.
+  itself: a Codex turn may only run while the Twinmind reply it descends from is running;
+  anything else is stopped the moment it starts.
 
 ## 0.6.0
 
